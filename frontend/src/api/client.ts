@@ -101,7 +101,8 @@ export interface UserBehaviorItem {
   total_requests: number;
   blocked_requests: number;
   anomaly_score: number;
-  top_triggers: [string, number][];
+  warned_requests: number;
+  top_triggers: { rule_id: string; count: number }[];
 }
 
 // ── API Functions ──
@@ -146,8 +147,8 @@ export async function getUserBehavior(params: { page?: number; user_id?: string 
   return request<UserBehaviorPage>(`/v1/dashboard/users/behavior?${qs}`);
 }
 
-export async function updateRule(ruleId: string, data: { enabled?: boolean }) {
-  return request(`/v1/rules/${ruleId}`, {
+export async function updateRule(ruleId: string, data: { enabled?: boolean }): Promise<RuleItem> {
+  return request<RuleItem>(`/v1/rules/${ruleId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import type { RuleItem } from '../api/client'
 import { getRules, updateRule } from '../api/client'
 
@@ -15,25 +15,30 @@ export default function Rules() {
   const [severity, setSeverity] = useState('')
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const pageSize = 20
 
-  const fetchRules = () => {
+  const fetchRules = useCallback(() => {
     setLoading(true)
+    setError(null)
     getRules({ page, page_size: pageSize, severity: severity || undefined })
       .then((data) => { setRules(data.items); setTotal(data.total) })
-      .catch(() => {})
+      .catch((e) => { setError(e.message) })
       .finally(() => setLoading(false))
-  }
+  }, [page, pageSize, severity])
 
-  useEffect(() => { fetchRules() }, [page, severity])
+  useEffect(() => { fetchRules() }, [fetchRules])
 
-  const handleToggle = async (ruleId: string, current: boolean) => {
+  const handleToggle = async (ruleId: string, currentEnabled: boolean) => {
     setToggling(ruleId)
+    // Optimistic update
+    setRules(rules.map(r => r.id === ruleId ? { ...r, enabled: !currentEnabled } : r))
     try {
-      await updateRule(ruleId, { enabled: !current })
-      setRules((prev) => prev.map((r) => r.id === ruleId ? { ...r, enabled: !current } : r))
+      await updateRule(ruleId, { enabled: !currentEnabled })
     } catch (e) {
-      console.error('Toggle failed', e)
+      // Revert on failure
+      setRules(rules.map(r => r.id === ruleId ? { ...r, enabled: currentEnabled } : r))
+      setError(`Failed to update rule ${ruleId}`)
     }
     setToggling(null)
   }
@@ -58,9 +63,13 @@ export default function Rules() {
         <span className="text-sm text-slate-500 self-center">{total} total rules</span>
       </div>
 
+      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">Failed to load: {error}</div>}
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-slate-500">Loading...</div>
+        ) : rules.length === 0 ? (
+          <div className="p-8 text-center text-slate-400">No data</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -99,15 +108,12 @@ export default function Rules() {
                       }`}
                     >
                       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                        rule.enabled ? 'translate-x-4.5' : 'translate-x-1'
+                        rule.enabled ? 'translate-x-[18px]' : 'translate-x-1'
                       }`} />
                     </button>
                   </td>
                 </tr>
               ))}
-              {rules.length === 0 && (
-                <tr><td colSpan={6} className="p-8 text-center text-slate-400">No data</td></tr>
-              )}
             </tbody>
           </table>
         )}

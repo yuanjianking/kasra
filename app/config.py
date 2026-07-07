@@ -8,6 +8,7 @@ Loads settings from:
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Literal
 
@@ -45,4 +46,18 @@ class AppSettings(BaseSettings):
     )
 
 
+def validate_settings(settings: AppSettings) -> None:
+    """Validate that production secrets have been changed from defaults."""
+    _warnings = []
+    if settings.api_key == "dev-api-key-change-in-production":
+        _warnings.append("KASRA_APP_API_KEY is still set to the default development key!")
+    if settings.jwt_secret == "change-this-to-a-random-secret":
+        _warnings.append("KASRA_APP_JWT_SECRET is still set to the default development secret!")
+    if _warnings:
+        _logger = logging.getLogger("kasra")
+        for w in _warnings:
+            _logger.warning("SECURITY: %s", w)
+
+
 settings = AppSettings()
+

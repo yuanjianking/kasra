@@ -93,10 +93,8 @@ def _create_engine(database_url: str, echo: bool = False) -> Engine:
             cursor.execute("PRAGMA busy_timeout=30000")
             cursor.close()
 
-        @event.listens_for(engine, "begin")
-        def _do_begin(dbapi_connection: Any) -> None:
-            """Handle nested transactions for SQLite."""
-            dbapi_connection.execute(text("SELECT 1"))
+        # Removed: The @event.listens_for(engine, "begin") hook that executed SELECT 1
+        # on every transaction start. This caused unnecessary overhead for SQLite.
 
     # ── PostgreSQL connection logging ──
     if db_type == "postgres":

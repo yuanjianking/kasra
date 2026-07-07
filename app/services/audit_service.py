@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 import logging
 from datetime import datetime
 from typing import Any
@@ -58,6 +57,11 @@ def query_logs(
     # Count total
     total = query.count()
 
+    # Security: whitelist sort fields to prevent column enumeration
+    ALLOWED_SORT_COLUMNS = {"timestamp", "severity", "user_id", "rule_id", "action", "direction", "status"}
+    if sort_by not in ALLOWED_SORT_COLUMNS:
+        sort_by = "timestamp"
+
     # Sorting
     sort_col = getattr(AuditLog, sort_by, AuditLog.timestamp)
     order_fn = desc if sort_order == "desc" else asc
@@ -81,44 +85,64 @@ def generate_report(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
 ) -> ComplianceReportResponse:
-    """Generate a compliance report with summary statistics."""
-    query = db.query(AuditLog)
+    """Generate a compliance report with summary statistics using SQL aggregation."""
+    from sqlalchemy import func, case
 
+    base_query = db.query(AuditLog)
     if start_time:
-        query = query.filter(AuditLog.timestamp >= start_time)
+        base_query = base_query.filter(AuditLog.timestamp >= start_time)
     if end_time:
-        query = query.filter(AuditLog.timestamp <= end_time)
+        base_query = base_query.filter(AuditLog.timestamp <= end_time)
 
-    all_logs = query.all()
-    total = len(all_logs)
+    # Aggregate counts in a single query
+    agg = db.query(
+        func.count(AuditLog.id).label("total"),
+        func.sum(case((AuditLog.action == "block", 1), else_=0)).label("blocked"),
+        func.sum(case((AuditLog.action == "warn", 1), else_=0)).label("warned"),
+        func.sum(case((AuditLog.severity == "P0", 1), else_=0)).label("p0"),
+        func.sum(case((AuditLog.severity == "P1", 1), else_=0)).label("p1"),
+        func.sum(case((AuditLog.severity == "P2", 1), else_=0)).label("p2"),
+        func.count(func.distinct(AuditLog.user_id)).label("unique_users"),
+        func.count(func.distinct(AuditLog.rule_id)).label("unique_rules"),
+    ).filter(
+        AuditLog.timestamp >= (start_time or datetime.min),
+        AuditLog.timestamp <= (end_time or datetime.max),
+    ).first()
 
-    blocked = sum(1 for l in all_logs if l.action == "block")
-    warned = sum(1 for l in all_logs if l.action == "warn")
-    p0 = sum(1 for l in all_logs if l.severity == "P0")
-    p1 = sum(1 for l in all_logs if l.severity == "P1")
-    p2 = sum(1 for l in all_logs if l.severity == "P2")
-    unique_users = len(set(l.user_id for l in all_logs if l.user_id))
-    unique_rules = len(set(l.rule_id for l in all_logs))
+    total = agg.total or 0
+    blocked = agg.blocked or 0
+    warned = agg.warned or 0
+    p0 = agg.p0 or 0
+    p1 = agg.p1 or 0
+    p2 = agg.p2 or 0
+    unique_users = agg.unique_users or 0
+    unique_rules = agg.unique_rules or 0
 
-    # Top triggered rules
-    rule_counts: dict[str, int] = {}
-    for l in all_logs:
-        rule_counts[l.rule_id] = rule_counts.get(l.rule_id, 0) + 1
-    top_rules = sorted(rule_counts.items(), key=lambda x: -x[1])[:10]
+    # Top triggered rules (via GROUP BY)
+    top_rules_query = base_query.with_entities(
+        AuditLog.rule_id,
+        AuditLog.rule_name,
+        func.count(AuditLog.id).label("count"),
+    ).group_by(AuditLog.rule_id, AuditLog.rule_name).order_by(
+        func.count(AuditLog.id).desc()
+    ).limit(10).all()
+
     top_rules_list = [
-        {"rule_id": rid, "count": cnt, "rule_name": next(
-            (l.rule_name for l in all_logs if l.rule_id == rid), ""
-        )}
-        for rid, cnt in top_rules
+        {"rule_id": r.rule_id, "count": r.count, "rule_name": r.rule_name}
+        for r in top_rules_query
     ]
 
     # Date range
-    timestamps = [l.timestamp for l in all_logs if l.timestamp]
+    date_query = db.query(
+        func.min(AuditLog.timestamp).label("start"),
+        func.max(AuditLog.timestamp).label("end"),
+    ).select_from(AuditLog).first()
+
     date_range = {}
-    if timestamps:
+    if date_query and date_query.start:
         date_range = {
-            "start": min(timestamps).isoformat(),
-            "end": max(timestamps).isoformat(),
+            "start": date_query.start.isoformat(),
+            "end": date_query.end.isoformat(),
         }
 
     return ComplianceReportResponse(

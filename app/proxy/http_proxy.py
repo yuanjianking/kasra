@@ -13,6 +13,27 @@ from typing import Any
 import httpx
 
 from app.services.engine_service import engine_service
+from app.services.scan_service import _log_to_db
+from app.database import SessionLocal
+
+# Shared connection pool — reuse across all proxy requests
+_shared_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = httpx.AsyncClient(
+            timeout=120.0,
+            follow_redirects=True,
+            limits=httpx.Limits(
+                max_connections=50,
+                max_keepalive_connections=20,
+                keepalive_expiry=60.0,
+            ),
+        )
+    return _shared_client
+
 
 logger = logging.getLogger("kasra.proxy")
 
@@ -110,10 +131,27 @@ async def proxy_request(
         except (json.JSONDecodeError, UnicodeDecodeError):
             pass
 
+        # Also scan raw body as text if no structured content was extracted
+        if not content.strip() and body and method in ("POST", "PUT", "PATCH"):
+            try:
+                content = body.decode("utf-8", errors="ignore")[:10000]
+            except UnicodeDecodeError:
+                pass
+
     # ── 3. Input detection ──
     input_result = None
     if content.strip():
         input_result = engine_service.detect_input(content)
+
+    if input_result and input_result.triggered_rules:
+        try:
+            db = SessionLocal()
+            _log_to_db(db, result=input_result, direction="input",
+                        content=content, commit=True)
+            db.close()
+        except Exception:
+            import logging as _lg
+            _lg.getLogger("kasra.proxy").exception("Failed to log proxy input detection to DB")
 
     if input_result and input_result.blocked:
         logger.warning(
@@ -148,65 +186,76 @@ async def proxy_request(
     upstream_url = f"https://{host}{upstream_path}"
 
     try:
-        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
-            response = await client.request(
-                method=method,
-                url=upstream_url,
-                headers=filtered_headers,
-                content=body,
-            )
+        client = _get_client()
+        response = await client.request(
+            method=method,
+            url=upstream_url,
+            headers=filtered_headers,
+            content=body,
+        )
 
-            # ── 5. Output detection on response body ──
-            response_body = response.content
-            response_text = ""
+        # ── 5. Output detection on response body ──
+        response_body = response.content
+        response_text = ""
 
-            if response_body:
-                try:
-                    resp_data = json.loads(response_body)
-                    if isinstance(resp_data, dict):
-                        # Anthropic: content[].text
-                        for block in resp_data.get("content", []):
-                            if isinstance(block, dict) and block.get("type") == "text":
-                                response_text += block.get("text", "") + "\n"
-                        # OpenAI: choices[].message.content
-                        for choice in resp_data.get("choices", []):
-                            if isinstance(choice, dict):
-                                msg = choice.get("message", {})
-                                if isinstance(msg.get("content"), str):
-                                    response_text += msg["content"] + "\n"
-                                # Delta for streaming
-                                delta = choice.get("delta", {})
-                                if isinstance(delta.get("content"), str):
-                                    response_text += delta["content"]
-                except (json.JSONDecodeError, AttributeError):
-                    response_text = response_body.decode("utf-8", errors="replace")
+        if response_body:
+            try:
+                resp_data = json.loads(response_body)
+                if isinstance(resp_data, dict):
+                    # Anthropic: content[].text
+                    for block in resp_data.get("content", []):
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            response_text += block.get("text", "") + "\n"
+                    # OpenAI: choices[].message.content
+                    for choice in resp_data.get("choices", []):
+                        if isinstance(choice, dict):
+                            msg = choice.get("message", {})
+                            if isinstance(msg.get("content"), str):
+                                response_text += msg["content"] + "\n"
+                            # Delta for streaming
+                            delta = choice.get("delta", {})
+                            if isinstance(delta.get("content"), str):
+                                response_text += delta["content"]
+            except (json.JSONDecodeError, AttributeError):
+                response_text = response_body.decode("utf-8", errors="replace")
 
-            output_result = None
-            if response_text.strip():
-                output_result = engine_service.detect_output(response_text)
+        output_result = None
+        if response_text.strip():
+            output_result = engine_service.detect_output(response_text)
 
-            detection_info = {
-                "input": {
-                    "blocked": False,
-                    "triggered_rules": [
-                        {"rule_id": dr.rule_id, "severity": str(dr.severity)}
-                        for dr in (input_result.triggered_rules if input_result else [])
-                    ] if input_result and input_result.triggered_rules else [],
-                },
-                "output": {
-                    "warnings": [
-                        {"rule_id": dr.rule_id, "severity": str(dr.severity)}
-                        for dr in (output_result.triggered_rules if output_result else [])
-                    ] if output_result and output_result.triggered_rules else [],
-                },
-            }
+        # Log to audit database
+        if output_result and output_result.triggered_rules:
+            try:
+                db = SessionLocal()
+                _log_to_db(db, result=output_result, direction="output",
+                            content=response_text, commit=True)
+                db.close()
+            except Exception:
+                import logging as _lg
+                _lg.getLogger("kasra.proxy").exception("Failed to log proxy detection to DB")
 
-            return {
-                "status_code": response.status_code,
-                "headers": dict(response.headers),
-                "body": response_body,
-                "detection": detection_info,
-            }
+        detection_info = {
+            "input": {
+                "blocked": False,
+                "triggered_rules": [
+                    {"rule_id": dr.rule_id, "severity": str(dr.severity)}
+                    for dr in (input_result.triggered_rules if input_result else [])
+                ] if input_result and input_result.triggered_rules else [],
+            },
+            "output": {
+                "warnings": [
+                    {"rule_id": dr.rule_id, "severity": str(dr.severity)}
+                    for dr in (output_result.triggered_rules if output_result else [])
+                ] if output_result and output_result.triggered_rules else [],
+            },
+        }
+
+        return {
+            "status_code": response.status_code,
+            "headers": dict(response.headers),
+            "body": response_body,
+            "detection": detection_info,
+        }
 
     except httpx.TimeoutException:
         return {

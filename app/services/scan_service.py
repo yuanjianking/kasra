@@ -29,16 +29,23 @@ def _log_to_db(
     session_id: str | None = None,
     request_id: str | None = None,
     file_path: str | None = None,
+    content: str | None = None,
+    commit: bool = True,
 ) -> None:
     """Write detection results to the audit_logs table."""
     from datetime import datetime
 
     now = datetime.utcnow()
 
+    # Security: redact sensitive matched text for credential leak rules
+    SENSITIVE_CATEGORIES = {"credential_leak", "secrets", "credentials"}
+
     for dr in result.triggered_rules:
         matched_text = (
-            dr.matches[0].matched_text[:500] if dr.matches else None
+            dr.matches[0].matched_text[:500] if dr.matches and len(dr.matches) > 0 else None
         )
+        if dr.category in SENSITIVE_CATEGORIES and matched_text and len(matched_text) > 8:
+            matched_text = matched_text[:4] + "****" + matched_text[-4:]
         log_entry = AuditLog(
             timestamp=now,
             user_id=user_id,
@@ -49,7 +56,7 @@ def _log_to_db(
             severity=dr.severity.value if hasattr(dr.severity, "value") else str(dr.severity),
             action=dr.action.value if hasattr(dr.action, "value") else str(dr.action),
             direction=direction,
-            content_snippet=None,
+            content_snippet=content[:200] if content else None,
             matched_text=matched_text,
             file_path=file_path,
             line_number=None,
@@ -68,7 +75,8 @@ def _log_to_db(
         rule_ids=[dr.rule_id for dr in result.triggered_rules],
     )
 
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def _update_user_behavior(
@@ -141,6 +149,7 @@ def scan_input(
     _log_to_db(
         db, result=result, direction="input",
         user_id=user_id, session_id=session_id, request_id=request_id,
+        content=content,
     )
 
     return _to_scan_response(result)
@@ -164,6 +173,7 @@ def scan_output(
     _log_to_db(
         db, result=result, direction="output",
         user_id=user_id, session_id=session_id, request_id=request_id,
+        content=content,
     )
 
     return _to_scan_response(result)
@@ -204,7 +214,7 @@ def scan_batch(
                 severity=str(dr.severity.value if hasattr(dr.severity, "value") else dr.severity),
                 action=str(dr.action.value if hasattr(dr.action, "value") else dr.action),
                 match_count=dr.match_count,
-                matched_text=dr.matches[0].matched_text[:200] if dr.matches else None,
+                matched_text=dr.matches[0].matched_text[:200] if dr.matches and len(dr.matches) > 0 else None,
                 evidence=[{"source_layer": e.source_layer, "reason": e.reason} for e in dr.evidence] if dr.evidence else [],
             ))
 
@@ -227,7 +237,10 @@ def scan_batch(
         _log_to_db(
             db, result=r, direction="batch",
             user_id=user_id, file_path=file_path,
+            commit=False,
         )
+
+    db.commit()
 
     return BatchScanResponse(
         total_files=len(results),
@@ -248,7 +261,7 @@ def _to_scan_response(result: "kasra.models.result.AggregatedResult") -> ScanRes
             severity=dr.severity.value if hasattr(dr.severity, "value") else str(dr.severity),
             action=dr.action.value if hasattr(dr.action, "value") else str(dr.action),
             match_count=dr.match_count,
-            matched_text=dr.matches[0].matched_text[:200] if dr.matches else None,
+            matched_text=dr.matches[0].matched_text[:200] if dr.matches and len(dr.matches) > 0 else None,
             evidence=[{"source_layer": e.source_layer, "reason": e.reason} for e in dr.evidence] if dr.evidence else [],
         ))
 

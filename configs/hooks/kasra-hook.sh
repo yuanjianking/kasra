@@ -112,7 +112,9 @@ print(json.dumps({'content': text, 'user_id': 'claude-code'}))
         -d "$payload" 2>/dev/null)
 
     if [ -z "$response" ]; then
-        # Fallback: CLI
+        # Fallback: CLI — use input detection as an approximation since
+        # there is no dedicated output detection CLI command.
+        # This may give approximate results.
         response=$(echo "$CONTENT" | kasra-scan input --stdin 2>/dev/null) || true
         if echo "$response" | grep -qi "blocked\|❌ BLOCKED"; then
             echo "⚠️  Kasra (CLI) detected output risk"

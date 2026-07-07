@@ -30,7 +30,7 @@ class RuleConfig(Base):
     enabled = Column(Boolean, default=True, nullable=False)
     is_custom = Column(Boolean, default=False, nullable=False)
     source = Column(String(64), nullable=True)  # "sdk", "user"
-    extra_metadata = Column("metadata", JSON, nullable=True, default=dict)
+    extra_metadata = Column(JSON, nullable=True, default=dict)
 
     def __repr__(self) -> str:
         return (

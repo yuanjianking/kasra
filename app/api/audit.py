@@ -34,6 +34,12 @@ def list_audit_logs(
     db: DBSession = Depends(get_db),
 ):
     """Query audit logs with filters and pagination."""
+    # Security: whitelist sort_by to prevent column enumeration
+    ALLOWED_SORT_COLUMNS = {"timestamp", "severity", "user_id", "rule_id", "action", "direction", "status"}
+    if sort_by not in ALLOWED_SORT_COLUMNS:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"Invalid sort field: {sort_by}")
+
     return audit_service.query_logs(
         db,
         user_id=user_id,

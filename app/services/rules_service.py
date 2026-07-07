@@ -33,13 +33,9 @@ def list_rules(
     sdk_rules = engine_service.engine.get_rules()
 
     # 2. Load DB custom rules + overrides
+    # NOTE: category/severity/enabled filters are applied in-memory below
+    # to ensure SDK rules are also filtered consistently.
     db_query = db.query(RuleConfig)
-    if category:
-        db_query = db_query.filter(RuleConfig.category == category)
-    if severity:
-        db_query = db_query.filter(RuleConfig.severity == severity)
-    if enabled_only is not None:
-        db_query = db_query.filter(RuleConfig.enabled == enabled_only)
     if custom_only:
         db_query = db_query.filter(RuleConfig.is_custom == True)
 

@@ -14,7 +14,7 @@ export default function Dashboard() {
   useEffect(() => {
     Promise.all([getDashboardSummary(), getDashboardTrend('7d')])
       .then(([s, t]) => { setSummary(s); setTrend(t) })
-      .catch(e => setError(e.message))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 

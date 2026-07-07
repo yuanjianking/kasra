@@ -21,13 +21,15 @@ export default function AuditLogs() {
   const [severity, setSeverity] = useState('')
   const [direction, setDirection] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const pageSize = 15
 
   const fetchLogs = () => {
     setLoading(true)
+    setError(null)
     getAuditLogs({ page, page_size: pageSize, severity: severity || undefined, direction: direction || undefined })
       .then((data) => { setLogs(data.items); setTotal(data.total) })
-      .catch(() => {})
+      .catch((e: Error) => { setError(e.message) })
       .finally(() => setLoading(false))
   }
 
@@ -65,6 +67,9 @@ export default function AuditLogs() {
           {total} total records
         </span>
       </div>
+
+      {/* Error */}
+      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">Failed to load: {error}</div>}
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

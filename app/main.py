@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.database import init_db, get_db_type
@@ -28,6 +28,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle: startup and shutdown."""
     # ── Startup ──
     logger.info("Starting Kasra application...")
+    from app.config import validate_settings
+    validate_settings(settings)
 
     # 1. Initialize database
     logger.info("Initializing database...")
@@ -127,15 +129,32 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,  # Changed from True — incompatible with allow_origins=["*"]
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
-    # ── API Key Authentication Middleware (optional for now) ──
-    # @app.middleware("http")
-    # async def api_key_middleware(request, call_next):
-    #     ...
+    # ── Security Middleware (body size limit + API key auth) ──
+    MAX_BODY_SIZE = 10 * 1024 * 1024  # 10 MB
+
+    @app.middleware("http")
+    async def security_middleware(request: Request, call_next):
+        # 1. Body size limit (prevent OOM attacks)
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_BODY_SIZE:
+            return JSONResponse(status_code=413, content={"error": f"Request body too large. Max: {MAX_BODY_SIZE} bytes"})
+
+        # 2. API key auth (skip for public endpoints)
+        public_paths = ("/health", "/redoc", "/docs", "/openapi.json")
+        if request.url.path not in public_paths and not request.url.path.startswith(("/v1/mcp",)):
+            api_key = request.headers.get("X-API-Key")
+            if not api_key or api_key != settings.api_key:
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "Missing or invalid API key. Provide X-API-Key header."},
+                )
+
+        return await call_next(request)
 
     # ── Register Routers ──
     from app.api.router import api_router

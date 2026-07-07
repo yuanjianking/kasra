@@ -8,13 +8,15 @@ export default function UserBehavior() {
   const [page, setPage] = useState(1)
   const [userId, setUserId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const pageSize = 20
 
   const fetchData = () => {
     setLoading(true)
+    setError(null)
     getUserBehavior({ page, user_id: userId || undefined })
       .then((data) => { setItems(data.items); setTotal(data.total) })
-      .catch(() => {})
+      .catch((e) => { setError(e.message) })
       .finally(() => setLoading(false))
   }
 
@@ -43,6 +45,8 @@ export default function UserBehavior() {
         <span className="text-sm text-slate-500 self-center ml-auto">{total} total records</span>
       </div>
 
+      {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">Failed to load: {error}</div>}
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-slate-500">Loading...</div>
@@ -66,13 +70,13 @@ export default function UserBehavior() {
                   <td className="p-3 text-xs text-slate-500">{item.date}</td>
                   <td className="p-3">{item.total_requests}</td>
                   <td className="p-3 text-red-600">{item.blocked_requests}</td>
-                  <td className="p-3 text-amber-600">{item.total_requests - item.blocked_requests}</td>
+                  <td className="p-3 text-amber-600">{item.warned_requests}</td>
                   <td className={`p-3 ${getAnomalyColor(item.anomaly_score)}`}>{item.anomaly_score}</td>
                   <td className="p-3">
                     <div className="flex gap-1 flex-wrap">
-                      {item.top_triggers.slice(0, 3).map(([ruleId, count]) => (
-                        <span key={ruleId} className="px-2 py-0.5 bg-slate-100 text-xs rounded-full">
-                          {ruleId}: {count}
+                      {item.top_triggers.slice(0, 3).map(({ rule_id, count }) => (
+                        <span key={rule_id} className="px-2 py-0.5 bg-slate-100 text-xs rounded-full">
+                          {rule_id}: {count}
                         </span>
                       ))}
                     </div>

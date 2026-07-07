@@ -131,7 +131,15 @@ def scan_file(path: str) -> str:
         JSON string with scan findings.
     """
     _ensure_engine()
+
+    # Security: prevent path traversal (check before abspath normalization
+    # so sneaky paths like "safe_dir/../../etc/passwd" are caught)
+    normalized = os.path.normpath(path)
+    if ".." in normalized.split(os.sep):
+        return json.dumps({"error": "Path traversal is not allowed", "findings": []}, ensure_ascii=False)
+
     full_path = os.path.abspath(path)
+
     if not os.path.exists(full_path):
         return json.dumps({"error": f"Path not found: {full_path}"}, ensure_ascii=False)
 

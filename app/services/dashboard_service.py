@@ -20,67 +20,33 @@ from app.schemas.dashboard import (
 
 
 def get_summary(db: DBSession) -> DashboardSummary:
-    """Compute dashboard summary for the last 24 hours."""
+    """Compute dashboard summary for the last 24 hours using aggregated queries."""
     since = datetime.utcnow() - timedelta(hours=24)
 
-    # Total requests (audit log entries) in 24h
-    total_24h = (
-        db.query(func.count(AuditLog.id))
-        .filter(AuditLog.timestamp >= since)
-        .scalar()
-        or 0
-    )
+    # 1. Single aggregation query for counts
+    agg = db.query(
+        func.count(AuditLog.id).label("total"),
+        func.sum(case((AuditLog.action == "block", 1), else_=0)).label("blocked"),
+        func.sum(case((AuditLog.action == "warn", 1), else_=0)).label("warned"),
+        func.sum(case((AuditLog.severity == "P0", 1), else_=0)).label("p0"),
+        func.sum(case((AuditLog.severity == "P1", 1), else_=0)).label("p1"),
+        func.count(func.distinct(AuditLog.user_id)).label("active_users"),
+        func.count(func.distinct(AuditLog.rule_id)).label("active_rules"),
+    ).filter(AuditLog.timestamp >= since).first()
 
-    blocked_24h = (
-        db.query(func.count(AuditLog.id))
-        .filter(AuditLog.timestamp >= since, AuditLog.action == "block")
-        .scalar()
-        or 0
-    )
-
-    warned_24h = (
-        db.query(func.count(AuditLog.id))
-        .filter(AuditLog.timestamp >= since, AuditLog.action == "warn")
-        .scalar()
-        or 0
-    )
-
-    p0_24h = (
-        db.query(func.count(AuditLog.id))
-        .filter(AuditLog.timestamp >= since, AuditLog.severity == "P0")
-        .scalar()
-        or 0
-    )
-
-    p1_24h = (
-        db.query(func.count(AuditLog.id))
-        .filter(AuditLog.timestamp >= since, AuditLog.severity == "P1")
-        .scalar()
-        or 0
-    )
-
+    total_24h = agg.total or 0
+    blocked_24h = agg.blocked or 0
+    warned_24h = agg.warned or 0
+    p0_24h = agg.p0 or 0
+    p1_24h = agg.p1 or 0
     p2_24h = total_24h - p0_24h - p1_24h
-
-    # Active users in 24h
-    active_users = (
-        db.query(func.count(func.distinct(AuditLog.user_id)))
-        .filter(AuditLog.timestamp >= since, AuditLog.user_id.isnot(None))
-        .scalar()
-        or 0
-    )
-
-    # Active rules (distinct rule_ids triggered in 24h)
-    active_rules = (
-        db.query(func.count(func.distinct(AuditLog.rule_id)))
-        .filter(AuditLog.timestamp >= since)
-        .scalar()
-        or 0
-    )
+    active_users = agg.active_users or 0
+    active_rules = agg.active_rules or 0
 
     # Block rate
     block_rate = round((blocked_24h / total_24h * 100) if total_24h > 0 else 0, 1)
 
-    # Top triggered rules
+    # 2. Top triggered rules
     top_rules_raw = (
         db.query(
             AuditLog.rule_id,
@@ -98,7 +64,7 @@ def get_summary(db: DBSession) -> DashboardSummary:
         for r in top_rules_raw
     ]
 
-    # Top users by request count
+    # 3. Top users
     top_users_raw = (
         db.query(
             AuditLog.user_id,
