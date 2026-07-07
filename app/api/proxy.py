@@ -22,7 +22,7 @@ logger = logging.getLogger("kasra.api.proxy")
 router = APIRouter(prefix="/v1/proxy", tags=["Proxy"])
 
 
-@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT"])
+@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT"], include_in_schema=False)
 async def proxy_handler(path: str, request: Request):
     """Proxy endpoint — forwards requests to upstream AI APIs with security scanning.
 

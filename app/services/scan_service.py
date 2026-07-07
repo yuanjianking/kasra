@@ -153,6 +153,9 @@ def _update_user_behavior(
             rule_triggers={},
         )
         db.add(behavior)
+        # Flush so subsequent calls in the same transaction (e.g. batch scan
+        # across multiple files without per-file commit) can see this row.
+        db.flush()
 
     behavior.total_requests += 1
     if blocked:

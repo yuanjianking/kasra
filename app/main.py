@@ -226,6 +226,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
         docs_url="/docs",
         redoc_url="/redoc",
+        # Ensure unique operation IDs in case of routing edge cases
+        generate_unique_id_function=lambda route: f"{route.name}_{route.path.replace('/', '_')}",
     )
 
     # ── Middleware ──
