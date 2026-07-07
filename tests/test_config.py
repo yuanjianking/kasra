@@ -25,3 +25,23 @@ class TestAppSettings:
 
     def test_audit_retention_default(self):
         assert settings.audit_retention_days == 90
+
+    # ── HTTPS CONNECT proxy ──
+
+    def test_https_proxy_disabled_by_default(self):
+        """CONNECT proxy should be opt-in."""
+        assert AppSettings.model_fields["https_proxy_enabled"].default is False
+
+    def test_https_proxy_default_host(self):
+        assert AppSettings.model_fields["https_proxy_host"].default == "0.0.0.0"
+
+    def test_https_proxy_default_port(self):
+        assert AppSettings.model_fields["https_proxy_port"].default == 8443
+
+    def test_https_proxy_from_env(self, monkeypatch):
+        """HTTPS proxy settings should be configurable via env vars."""
+        monkeypatch.setenv("KASRA_APP_HTTPS_PROXY_ENABLED", "true")
+        monkeypatch.setenv("KASRA_APP_HTTPS_PROXY_PORT", "9090")
+        s = AppSettings()
+        assert s.https_proxy_enabled is True
+        assert s.https_proxy_port == 9090

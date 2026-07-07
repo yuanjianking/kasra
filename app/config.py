@@ -40,6 +40,11 @@ class AppSettings(BaseSettings):
     # ── CORS ──
     allowed_origins: list[str] = ["*"]  # Change to specific origins in production
 
+    # ── HTTPS CONNECT Proxy ──
+    https_proxy_enabled: bool = False  # Opt-in: disabled by default
+    https_proxy_host: str = "0.0.0.0"
+    https_proxy_port: int = 8443
+
     # ── Audit ──
     audit_retention_days: int = 90  # Auto-delete audit logs older than this
 

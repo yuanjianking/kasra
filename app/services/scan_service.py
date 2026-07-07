@@ -39,13 +39,23 @@ def _log_to_db(
     now = datetime.utcnow()
 
     # Security: redact sensitive matched text for credential leak rules
+    # Note: DetectionResult doesn't carry `category` directly;
+    # look it up from the engine's rule definition when available.
     SENSITIVE_CATEGORIES = {"credential_leak", "secrets", "credentials"}
 
     for dr in result.triggered_rules:
         matched_text = (
             dr.matches[0].matched_text[:500] if dr.matches and len(dr.matches) > 0 else None
         )
-        if dr.category in SENSITIVE_CATEGORIES and matched_text and len(matched_text) > 8:
+        # Attempt to determine category (DetectionResult lacks it; try engine lookup)
+        dr_category = getattr(dr, "category", None)
+        if dr_category is None:
+            try:
+                rule_obj = engine_service.engine.get_rule(dr.rule_id)
+                dr_category = getattr(rule_obj, "category", None)
+            except (KeyError, RuntimeError, AttributeError):
+                pass
+        if dr_category in SENSITIVE_CATEGORIES and matched_text and len(matched_text) > 8:
             matched_text = matched_text[:4] + "****" + matched_text[-4:]
         log_entry = AuditLog(
             timestamp=now,

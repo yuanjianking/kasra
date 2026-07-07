@@ -137,7 +137,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("Seed data skipped: %s", exc)
 
-    # 2. Initialize SDK RuleEngine
+    # 2b. Start TCP CONNECT proxy (optional — opt-in via config)
+    connect_proxy = None
+    if settings.https_proxy_enabled:
+        from app.proxy.tcp_proxy import ConnectProxy
+
+        # Reuse the same allowed upstreams as the HTTP proxy
+        _allowed = ["api.anthropic.com", "api.openai.com", "api.deepseek.com"]
+        connect_proxy = ConnectProxy(
+            host=settings.https_proxy_host,
+            port=settings.https_proxy_port,
+            allowed_upstreams=_allowed,
+        )
+        await connect_proxy.start()
+
+    # 3. Initialize SDK RuleEngine
     logger.info("Initializing Kasra SDK RuleEngine...")
     engine_service.initialize()
     logger.info(
@@ -162,6 +176,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # ── Shutdown ──
     logger.info("Shutting down Kasra application...")
+    if connect_proxy:
+        await connect_proxy.stop()
     engine_service.shutdown()
     logger.info("Shutdown complete.")
 

@@ -8,6 +8,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session as DBSession
 
+from kasra.exceptions.errors import RuleNotFoundError
+
 from app.models.rule_config import RuleConfig
 from app.schemas.rules import RuleCreate, RuleSchema, RuleUpdate
 from app.services.engine_service import engine_service
@@ -78,6 +80,8 @@ def list_rules(
     # Apply filters
     if category:
         merged = [r for r in merged if r.category == category]
+    if custom_only:
+        merged = [r for r in merged if r.is_custom]
     if severity:
         merged = [r for r in merged if r.severity == severity]
     if enabled_only is not None:
@@ -113,7 +117,7 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
             is_custom=False,
             source="sdk",
         )
-    except KeyError:
+    except (KeyError, RuleNotFoundError):
         pass
 
     # Check DB custom rules
@@ -187,7 +191,7 @@ def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema |
         # Check if it's a valid SDK rule
         try:
             engine_service.engine.get_rule(rule_id)
-        except KeyError:
+        except (KeyError, RuleNotFoundError):
             return None
 
         db_rule = RuleConfig(

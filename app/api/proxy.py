@@ -60,9 +60,12 @@ async def proxy_handler(path: str, request: Request):
     detection = result.get("detection")
     response_headers = dict(result.get("headers", {}))
 
-    # Don't pass through transfer-encoding since we're re-serializing
+    # Don't pass through transfer-encoding or content-encoding since
+    # httpx already decodes the body automatically
     response_headers.pop("transfer-encoding", None)
     response_headers.pop("Transfer-Encoding", None)
+    response_headers.pop("content-encoding", None)
+    response_headers.pop("Content-Encoding", None)
 
     response = Response(
         content=result.get("body"),

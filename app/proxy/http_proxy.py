@@ -292,16 +292,22 @@ async def handle_connect(
         "status_code": 501,
         "headers": {"content-type": "application/json"},
         "body": json.dumps({
-            "error": "CONNECT tunnel not supported in this mode",
+            "error": "CONNECT tunnel not supported via this HTTP endpoint",
             "message": (
-                "HTTP CONNECT (HTTPS proxy) requires a TCP-level proxy. "
-                "Use MCP integration or deploy nginx/squid as a forward proxy."
+                "Kasra's HTTP API (port 8080) does not support CONNECT tunneling. "
+                "Set KASRA_APP_HTTPS_PROXY_ENABLED=true and use port 8443 for "
+                "HTTPS CONNECT proxy support, or use MCP integration."
             ),
-            "supported_methods": [
-                "REST API: POST /v1/scan/input, POST /v1/scan/output",
-                "MCP: ws/sse at /v1/mcp/sse",
-                "CLI: kasra-scan review ./src",
-            ],
+            "recommendations": {
+                "https_proxy_port": 8443,
+                "https_proxy_env_var": "KASRA_APP_HTTPS_PROXY_ENABLED=true",
+                "env_vars": [
+                    "export HTTP_PROXY=http://kasra:8443",
+                    "export HTTPS_PROXY=http://kasra:8443",
+                ],
+                "mcp_integration": "Use MCP tools via /v1/mcp/sse for full IO inspection",
+                "alternative": "Deploy mitmproxy in front of Kasra for MITM HTTPS inspection",
+            },
         }).encode(),
         "detection": None,
     }
