@@ -1,0 +1,25 @@
+# Kasra Application Configuration
+server:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 4
+  log_level: "info"
+
+database:
+  url: "sqlite:///./data/kasra.db"
+  # url: "postgresql://user:password@localhost:5432/kasra"
+
+security:
+  api_key: "dev-api-key-change-in-production"
+  jwt_secret: "change-this-to-a-random-secret"
+
+proxy:
+  targets:
+    - api.anthropic.com
+    - api.openai.com
+  enable_connect_tunnel: true
+
+data:
+  dir: "./data"
+  audit_retention_days: 90
+  report_max_rows: 10000

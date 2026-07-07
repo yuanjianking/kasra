@@ -1,0 +1,78 @@
+{
+  "description": "🔒 Kasra AI Development Security Governance — full lifecycle security hooks for input/output/pre-execution",
+  "version": "0.1.0",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash configs/hooks/kasra-hook.sh input",
+            "timeout": 10000,
+            "description": "🔒 Kasra Input Scan: scan prompts for credential leaks (API Key/Token/Password), PII (phone/ID), prompt injection, etc."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash configs/hooks/kasra-hook.sh input",
+            "timeout": 5000,
+            "description": "🔒 Kasra Command Scan: scan shell commands for security risks (dangerous commands, credential leaks)"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash configs/hooks/kasra-hook.sh input",
+            "timeout": 10000,
+            "description": "🔒 Kasra Write Scan: scan file content before writing for security risks"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash configs/hooks/kasra-hook.sh output",
+            "timeout": 15000,
+            "description": "🛡️ Kasra Output Scan: scan AI-generated code for dangerous functions (eval/exec), dangerous commands (rm -rf), SQL injection, XSS"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash configs/hooks/kasra-hook.sh output",
+            "timeout": 10000,
+            "description": "🛡️ Kasra Output Scan: scan command output for sensitive information leaks (keys, passwords)"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash configs/hooks/kasra-hook.sh output",
+            "timeout": 10000,
+            "description": "🛡️ Kasra Read Scan: scan read file contents for security risks"
+          }
+        ]
+      }
+    ]
+  }
+}

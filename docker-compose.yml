@@ -1,0 +1,118 @@
+version: "3.8"
+
+# =============================================================================
+# Kasra — Docker Compose production deployment configuration
+# =============================================================================
+# Usage:
+#   Development mode (SQLite):    docker compose up -d
+#   Production mode (PostgreSQL): docker compose --profile production up -d
+# =============================================================================
+
+services:
+  # ── Kasra application server ──────────────────────────────────────────────
+  kasra:
+    build:
+      context: ..
+      dockerfile: kasra/Dockerfile
+    image: kasra:latest
+    container_name: kasra
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ./config:/config
+    environment:
+      # Database connection (auto-switch: SQLite → PostgreSQL)
+      - KASRA_APP_DATABASE_URL=${KASRA_DATABASE_URL:-sqlite:////data/kasra.db}
+      # PostgreSQL (production profile):
+      # - KASRA_APP_DATABASE_URL=postgresql://kasra:${POSTGRES_PASSWORD}@kasra-postgres:5432/kasra
+      # - KASRA_APP_DATABASE_URL=postgresql+psycopg2://kasra:${POSTGRES_PASSWORD}@kasra-postgres:5432/kasra
+
+      # Authentication
+      - KASRA_APP_API_KEY=${KASRA_API_KEY:-dev-api-key}
+      - KASRA_APP_JWT_SECRET=${KASRA_JWT_SECRET:-change-this-to-a-random-secret}
+
+      # SDK configuration
+      - KASRA_ENGINE__MAX_CONCURRENT_RULES=50
+      - KASRA_AUDIT__ENABLED=true
+      - KASRA_AUDIT__JSONL_PATH=/data/kasra-audit.jsonl
+
+      # Logging
+      - KASRA_APP_LOG_LEVEL=${KASRA_LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── PostgreSQL database ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: kasra-postgres
+    profiles:
+      - production
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: kasra
+      POSTGRES_USER: kasra
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Must set POSTGRES_PASSWORD environment variable}
+    volumes:
+      # Persistent data storage
+      - postgres-data:/var/lib/postgresql/data
+      # Auto-initialization scripts (execute on first startup)
+      - ./db/init/01-ddl.sql:/docker-entrypoint-initdb.d/01-ddl.sql:ro
+      - ./db/init/02-dml.sql:/docker-entrypoint-initdb.d/02-dml.sql:ro
+      - ./db/init/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kasra -d kasra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+    # Production tuning suggestions:
+    # command: >
+    #   -c shared_buffers=256MB
+    #   -c effective_cache_size=768MB
+    #   -c work_mem=16MB
+    #   -c maintenance_work_mem=64MB
+    #   -c random_page_cost=1.1
+    #   -c max_connections=50
+
+  # ── Adminer (database management tool, optional) ──────────────────────────
+  adminer:
+    image: adminer:latest
+    container_name: kasra-adminer
+    profiles:
+      - production
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    name: kasra-postgres-data

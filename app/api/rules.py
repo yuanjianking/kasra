@@ -1,0 +1,70 @@
+"""Rule management API endpoints."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session as DBSession
+
+from app.database import get_db
+from app.schemas.rules import RuleCreate, RuleSchema, RuleUpdate
+from app.services import rules_service
+
+router = APIRouter(prefix="/v1/rules", tags=["Rules"])
+
+
+@router.get("")
+def list_rules(
+    category: str | None = Query(default=None),
+    severity: str | None = Query(default=None, pattern=r"^(P0|P1|P2)$"),
+    enabled_only: bool | None = Query(default=None),
+    custom_only: bool | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=500),
+    db: DBSession = Depends(get_db),
+):
+    """List all rules (SDK built-in + custom)."""
+    return rules_service.list_rules(
+        db,
+        category=category,
+        severity=severity,
+        enabled_only=enabled_only,
+        custom_only=custom_only,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/{rule_id}", response_model=RuleSchema)
+def get_rule(rule_id: str, db: DBSession = Depends(get_db)):
+    """Get a single rule by ID."""
+    rule = rules_service.get_rule(db, rule_id)
+    if rule is None:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}")
+    return rule
+
+
+@router.post("", response_model=RuleSchema, status_code=201)
+def create_rule(rule: RuleCreate, db: DBSession = Depends(get_db)):
+    """Create a new custom rule (U-series)."""
+    try:
+        return rules_service.create_rule(db, rule)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/{rule_id}", response_model=RuleSchema)
+def update_rule(rule_id: str, update: RuleUpdate, db: DBSession = Depends(get_db)):
+    """Update a rule (override SDK rule settings or modify custom rule)."""
+    rule = rules_service.update_rule(db, rule_id, update)
+    if rule is None:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}")
+    return rule
+
+
+@router.delete("/{rule_id}", status_code=204)
+def delete_rule(rule_id: str, db: DBSession = Depends(get_db)):
+    """Delete a custom rule or reset an SDK rule override."""
+    deleted = rules_service.delete_rule(db, rule_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}")
+    return None
