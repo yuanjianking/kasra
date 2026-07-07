@@ -11,6 +11,7 @@ from app.metrics import detections_total, detection_duration_ms
 from app.models.audit_log import AuditLog
 from app.models.user_behavior import UserBehavior
 from app.services.engine_service import engine_service
+from app.services.audit_chain import seal_chain_batch
 from app.schemas.scan import (
     BatchScanFileResult,
     BatchScanResponse,
@@ -19,6 +20,20 @@ from app.schemas.scan import (
 )
 
 logger = logging.getLogger("kasra.service.scan")
+
+
+# ── Enum conversion helpers ────────────────────────────────────────────────
+# SDK models use Pydantic enums (Severity, ActionType) that may or may not
+# have .value. These helpers handle both cases cleanly.
+
+def _sev(val: object) -> str:
+    """Convert a severity value to its string representation."""
+    return str(val.value if hasattr(val, "value") else val)
+
+
+def _act(val: object) -> str:
+    """Convert an action value to its string representation."""
+    return str(val.value if hasattr(val, "value") else val)
 
 
 def _log_to_db(
@@ -64,8 +79,8 @@ def _log_to_db(
             request_id=request_id,
             rule_id=dr.rule_id,
             rule_name=dr.rule_name,
-            severity=dr.severity.value if hasattr(dr.severity, "value") else str(dr.severity),
-            action=dr.action.value if hasattr(dr.action, "value") else str(dr.action),
+            severity=_sev(dr.severity),
+            action=_act(dr.action),
             direction=direction,
             content_snippet=content[:200] if content else None,
             matched_text=matched_text,
@@ -88,6 +103,17 @@ def _log_to_db(
 
     if commit:
         db.commit()
+        # Seal audit chain after each batch commit
+        try:
+            from app.database import SessionLocal
+            chain_db = SessionLocal()
+            last_id = db.query(AuditLog.id).order_by(AuditLog.id.desc()).first()
+            if last_id:
+                seal_chain_batch(chain_db, last_log_id=last_id[0],
+                                 batch_count=len(result.triggered_rules))
+            chain_db.close()
+        except Exception:
+            pass  # Best-effort: chain sealing failure does not block detection
 
 
 def _update_user_behavior(
@@ -222,8 +248,8 @@ def scan_batch(
             triggered.append(TriggeredRuleSchema(
                 rule_id=dr.rule_id,
                 rule_name=dr.rule_name,
-                severity=str(dr.severity.value if hasattr(dr.severity, "value") else dr.severity),
-                action=str(dr.action.value if hasattr(dr.action, "value") else dr.action),
+                severity=_sev(dr.severity),
+                action=_act(dr.action),
                 match_count=dr.match_count,
                 matched_text=dr.matches[0].matched_text[:200] if dr.matches and len(dr.matches) > 0 else None,
                 evidence=[{"source_layer": e.source_layer, "reason": e.reason} for e in dr.evidence] if dr.evidence else [],
@@ -231,7 +257,7 @@ def scan_batch(
 
         sev = "ok"
         if triggered:
-            sev = r.overall_severity.value if hasattr(r.overall_severity, "value") else str(r.overall_severity)
+            sev = _sev(r.overall_severity)
 
         file_results.append(BatchScanFileResult(
             file_path=file_path,
@@ -267,8 +293,8 @@ def _to_scan_response(result: "kasra.models.result.AggregatedResult", direction:
     # Record Prometheus metrics
     if result.triggered_rules:
         for dr in result.triggered_rules:
-            sev = dr.severity.value if hasattr(dr.severity, "value") else str(dr.severity)
-            act = dr.action.value if hasattr(dr.action, "value") else str(dr.action)
+            sev = _sev(dr.severity)
+            act = _act(dr.action)
             detections_total.labels(direction=direction, action=act, severity=sev).inc()
     detection_duration_ms.labels(direction=direction).observe(result.execution_time_ms)
 
@@ -277,8 +303,8 @@ def _to_scan_response(result: "kasra.models.result.AggregatedResult", direction:
         triggered.append(TriggeredRuleSchema(
             rule_id=dr.rule_id,
             rule_name=dr.rule_name,
-            severity=dr.severity.value if hasattr(dr.severity, "value") else str(dr.severity),
-            action=dr.action.value if hasattr(dr.action, "value") else str(dr.action),
+            severity=_sev(dr.severity),
+            action=_act(dr.action),
             match_count=dr.match_count,
             matched_text=dr.matches[0].matched_text[:200] if dr.matches and len(dr.matches) > 0 else None,
             evidence=[{"source_layer": e.source_layer, "reason": e.reason} for e in dr.evidence] if dr.evidence else [],
@@ -286,8 +312,8 @@ def _to_scan_response(result: "kasra.models.result.AggregatedResult", direction:
 
     return ScanResponse(
         blocked=result.blocked,
-        action=result.overall_action.value if hasattr(result.overall_action, "value") else str(result.overall_action),
-        severity=result.overall_severity.value if hasattr(result.overall_severity, "value") else str(result.overall_severity),
+        action=_act(result.overall_action),
+        severity=_sev(result.overall_severity),
         triggered_rules=triggered,
         warnings=result.warnings,
         execution_time_ms=result.execution_time_ms,

@@ -2,11 +2,26 @@ import { useState, lazy, Suspense } from 'react'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import Login from './pages/Login'
+import ErrorBoundary from './ErrorBoundary'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
 const Rules = lazy(() => import('./pages/Rules'))
 const UserBehavior = lazy(() => import('./pages/UserBehavior'))
+
+function LoadingSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4 p-4">
+      <div className="h-8 bg-slate-200 rounded w-48" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-24 bg-slate-200 rounded-xl" />
+        ))}
+      </div>
+      <div className="h-64 bg-slate-200 rounded-xl" />
+    </div>
+  )
+}
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
@@ -17,9 +32,11 @@ const navItems = [
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 
@@ -64,7 +81,6 @@ function AppContent() {
             </NavLink>
           ))}
         </div>
-        {/* Logout */}
         <div className="mt-auto pt-4 border-t border-slate-700 px-2">
           <button
             onClick={logout}
@@ -95,7 +111,7 @@ function AppContent() {
       {/* Content */}
       <main className="flex-1 overflow-auto">
         <div className="p-6 max-w-7xl mx-auto">
-          <Suspense fallback={<div className="flex items-center justify-center h-64 text-slate-400">Loading...</div>}>
+          <Suspense fallback={<LoadingSkeleton />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/audit-logs" element={<AuditLogs />} />

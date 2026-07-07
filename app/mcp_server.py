@@ -1,29 +1,12 @@
-"""Kasra MCP Server — Model Context Protocol implementation.
+"""Kasra MCP Server - Model Context Protocol implementation.
 
 Exposes Kasra's security detection capabilities as MCP tools,
 compatible with Claude Desktop, Cursor, and any MCP client.
 
-## Usage
-
-### Claude Desktop integration (stdio):
-\`\`\`json
-{
-  "mcpServers": {
-    "kasra": {
-      "command": "python",
-      "args": ["-m", "app.mcp_server"]
-    }
-  }
-}
-\`\`\`
-
-### Web SSE access (via FastAPI):
-    http://localhost:8080/v1/mcp/sse
-
-### Direct Python:
-    from app.mcp_server import kasra_server
-    async with kasra_server.run_stdio_async():
-        ...
+Usage:
+  Claude Desktop: add to claude_desktop_config.json
+  Web SSE: http://localhost:8080/v1/mcp/sse
+  Direct: from app.mcp_server import kasra_server
 """
 
 from __future__ import annotations
@@ -37,6 +20,20 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from app.services.engine_service import engine_service
+
+
+# ── Enum conversion helpers ────────────────────────────────────────────────
+# SDK models use Pydantic enums; these handle both enum and string values.
+
+def _sev(val: object) -> str:
+    """Convert severity to string."""
+    return str(val.value if hasattr(val, "value") else val)
+
+
+def _act(val: object) -> str:
+    """Convert action to string."""
+    return str(val.value if hasattr(val, "value") else val)
+
 
 # ---------------------------------------------------------------------------
 # FastMCP Server instance
@@ -156,8 +153,8 @@ def scan_file(path: str) -> str:
                 "file": file_path,
                 "rule_id": dr.rule_id,
                 "rule_name": dr.rule_name,
-                "severity": str(dr.severity.value if hasattr(dr.severity, "value") else dr.severity),
-                "action": str(dr.action.value if hasattr(dr.action, "value") else dr.action),
+                "severity": _sev(dr.severity),
+                "action": _act(dr.action),
                 "match_count": dr.match_count,
                 "matched_text": dr.matches[0].matched_text if dr.matches else None,
             })
@@ -202,7 +199,7 @@ def get_rules(
             continue
         if category and rule.category != category:
             continue
-        sev = str(rule.severity.value if hasattr(rule.severity, "value") else rule.severity)
+        sev = _sev(rule.severity)
         if severity and sev != severity:
             continue
 
@@ -212,7 +209,7 @@ def get_rules(
             "description": rule.description,
             "category": rule.category,
             "severity": sev,
-            "action": str(rule.action.value if hasattr(rule.action, "value") else rule.action),
+            "action": _act(rule.action),
             "enabled": rule.enabled,
         })
 
@@ -283,7 +280,7 @@ def scan_prompt(prompt: str, response: str = "", user_id: str | None = None) -> 
             "action": str(input_result.overall_action.value if hasattr(input_result.overall_action, "value") else input_result.overall_action),
             "severity": str(input_result.overall_severity.value if hasattr(input_result.overall_severity, "value") else input_result.overall_severity),
             "triggered_rules": [
-                {"rule_id": dr.rule_id, "rule_name": dr.rule_name, "severity": str(dr.severity.value if hasattr(dr.severity, "value") else dr.severity)}
+                {"rule_id": dr.rule_id, "rule_name": dr.rule_name, "severity": _sev(dr.severity)}
                 for dr in input_result.triggered_rules
             ],
             "warnings": input_result.warnings,
@@ -291,7 +288,7 @@ def scan_prompt(prompt: str, response: str = "", user_id: str | None = None) -> 
         "output": {
             "blocked": output_result.blocked if output_result else False,
             "triggered_rules": [
-                {"rule_id": dr.rule_id, "rule_name": dr.rule_name, "severity": str(dr.severity.value if hasattr(dr.severity, "value") else dr.severity)}
+                {"rule_id": dr.rule_id, "rule_name": dr.rule_name, "severity": _sev(dr.severity)}
                 for dr in (output_result.triggered_rules if output_result else [])
             ],
         } if output_result else None,
@@ -320,8 +317,8 @@ def _format_result(result: Any, direction: str) -> str:
             {
                 "rule_id": dr.rule_id,
                 "rule_name": dr.rule_name,
-                "severity": str(dr.severity.value if hasattr(dr.severity, "value") else dr.severity),
-                "action": str(dr.action.value if hasattr(dr.action, "value") else dr.action),
+                "severity": _sev(dr.severity),
+                "action": _act(dr.action),
                 "match_count": dr.match_count,
                 "matched_text": dr.matches[0].matched_text if dr.matches else None,
                 "evidence": [

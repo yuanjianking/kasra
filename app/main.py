@@ -6,6 +6,7 @@ sets up middleware, and registers all API route handlers.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections import defaultdict
@@ -18,6 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app import __version__
 from app.config import settings
 from app.database import init_db, get_db_type, check_db_health
 from app.services.engine_service import engine_service
@@ -32,42 +34,46 @@ from app.metrics import (
     active_users_24h,
     detections_total,
 )
+from app.logging import configure_logging
 
 logger = logging.getLogger("kasra")
 
+# ── Periodic audit cleanup task ────────────────────────────────────────────
+_cleanup_task: asyncio.Task | None = None
+
+
+async def _cleanup_audit_logs() -> None:
+    """Periodically delete audit logs older than retention_days."""
+    while True:
+        await asyncio.sleep(3600)  # Check every hour
+        try:
+            from app.database import SessionLocal
+            from app.models.audit_log import AuditLog
+            from datetime import datetime, timedelta, timezone
+            db = SessionLocal()
+            cutoff = datetime.now(timezone.utc) - timedelta(days=settings.audit_retention_days)
+            deleted = db.query(AuditLog).filter(AuditLog.timestamp < cutoff).delete()
+            if deleted:
+                db.commit()
+                logger.info("Cleaned up %d audit log entries older than %d days", deleted, settings.audit_retention_days)
+            db.close()
+        except Exception:
+            logger.exception("Audit log cleanup failed")
+
+
+# ── Application lifespan ───────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle: startup and shutdown."""
     # ── Startup ──
-    logger.info("Starting Kasra application...")
+    logger.info("Starting Kasra application (v%s)...", __version__)
     from app.config import validate_settings
     validate_settings(settings)
 
-    # Schedule periodic audit log cleanup
-    import threading as _threading
-
-    def _cleanup_audit_logs():
-        """Periodically delete audit logs older than retention_days."""
-        import time as _time
-        while True:
-            _time.sleep(3600)  # Check every hour
-            try:
-                from app.database import SessionLocal
-                from app.models.audit_log import AuditLog
-                from datetime import datetime, timedelta, timezone
-                db = SessionLocal()
-                cutoff = datetime.now(timezone.utc) - timedelta(days=settings.audit_retention_days)
-                deleted = db.query(AuditLog).filter(AuditLog.timestamp < cutoff).delete()
-                if deleted:
-                    db.commit()
-                    logger.info("Cleaned up %d audit log entries older than %d days", deleted, settings.audit_retention_days)
-                db.close()
-            except Exception:
-                pass
-
-    cleanup_thread = _threading.Thread(target=_cleanup_audit_logs, daemon=True)
-    cleanup_thread.start()
+    # Schedule periodic audit log cleanup via asyncio (not threading)
+    global _cleanup_task  # noqa: PLW0603
+    _cleanup_task = asyncio.create_task(_cleanup_audit_logs())
     logger.info("Audit log cleanup scheduled every hour (retention: %d days)", settings.audit_retention_days)
 
     # 1. Initialize database
@@ -137,12 +143,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as exc:
             logger.warning("Seed data skipped: %s", exc)
 
-    # 2b. Start TCP CONNECT proxy (optional — opt-in via config)
+    # 2. Start TCP CONNECT proxy (optional — opt-in via config)
     connect_proxy = None
     if settings.https_proxy_enabled:
         from app.proxy.tcp_proxy import ConnectProxy
 
-        # Reuse the same allowed upstreams as the HTTP proxy
         _allowed = ["api.anthropic.com", "api.openai.com", "api.deepseek.com"]
         connect_proxy = ConnectProxy(
             host=settings.https_proxy_host,
@@ -176,22 +181,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # ── Shutdown ──
     logger.info("Shutting down Kasra application...")
+    if _cleanup_task:
+        _cleanup_task.cancel()
     if connect_proxy:
         await connect_proxy.stop()
     engine_service.shutdown()
     logger.info("Shutdown complete.")
 
 
+# ── Rate limiter ───────────────────────────────────────────────────────────
+
 class RateLimiter:
-    """Simple in-memory rate limiter (sliding window)."""
+    """Simple in-memory rate limiter (sliding window).
+
+    NOTE: In multi-worker deployments, each worker has its own limiter.
+    For strict rate limiting across replicas, use a Redis-backed limiter.
+    """
     def __init__(self, requests_per_minute: int = 60):
         self.rpm = requests_per_minute
         self._windows: dict[str, list[float]] = defaultdict(list)
 
     def check(self, key: str) -> tuple[bool, int]:
         now = time.monotonic()
-        window = now - 60.0  # 1 minute ago
-        # Prune old entries
+        window = now - 60.0
         self._windows[key] = [t for t in self._windows[key] if t > window]
         count = len(self._windows[key])
         if count >= self.rpm:
@@ -199,16 +211,18 @@ class RateLimiter:
         self._windows[key].append(now)
         return True, self.rpm - count - 1
 
-# Default: 120 requests/minute (can be overridden via KASRA_APP_RATE_LIMIT env var)
+
 rate_limiter = RateLimiter(requests_per_minute=settings.rate_limit_rpm)
 
+
+# ── App factory ────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="Kasra API",
         description="AI Development Security Governance Platform",
-        version="0.1.0",
+        version=__version__,
         lifespan=lifespan,
         docs_url="/docs",
         redoc_url="/redoc",
@@ -217,7 +231,7 @@ def create_app() -> FastAPI:
     # ── Middleware ──
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.allowed_origins,  # From config
+        allow_origins=settings.allowed_origins,
         allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -231,12 +245,12 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def security_middleware(request: Request, call_next):
-        # 1a. Body size limit (prevent OOM attacks)
+        # 1. Body size limit (prevent OOM attacks)
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > MAX_BODY_SIZE:
             return JSONResponse(status_code=413, content={"error": f"Request body too large. Max: {MAX_BODY_SIZE} bytes"})
 
-        # 1b. Rate limiting (skip for MCP/static paths)
+        # 2. Rate limiting (skip for MCP/static paths)
         if not request.url.path.startswith(("/v1/mcp",)):
             client_ip = request.client.host if request.client else "unknown"
             allowed, remaining = rate_limiter.check(client_ip)
@@ -247,7 +261,7 @@ def create_app() -> FastAPI:
                     headers={"Retry-After": "60"},
                 )
 
-        # 2. API key auth (skip for public endpoints)
+        # 3. API key auth (skip for public endpoints)
         public_paths = ("/health", "/redoc", "/docs", "/openapi.json")
         if request.url.path not in public_paths and not request.url.path.startswith(("/v1/mcp",)):
             api_key = request.headers.get("X-API-Key")
@@ -271,7 +285,6 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
 
     # ── MCP Server (SSE transport) ──
-    # Accessible at: http://localhost:8080/v1/mcp/sse
     try:
         from app.mcp_server import kasra_server
         mcp_sse_app = kasra_server.sse_app()
@@ -293,16 +306,13 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-# ── Direct execution (uvicorn) ──
+# ── Direct execution ──
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level.upper(), logging.INFO),
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+    configure_logging(settings.log_level)
     uvicorn.run(
         "app.main:app",
         host=settings.host,
         port=settings.port,
-        workers=1,  # workers=1 for dev; >1 in production
+        workers=1,
         log_level=settings.log_level,
     )

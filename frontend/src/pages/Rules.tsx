@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import type { RuleItem } from '../api/client'
 import { getRules, updateRule } from '../api/client'
 
@@ -18,16 +18,16 @@ export default function Rules() {
   const [error, setError] = useState<string | null>(null)
   const pageSize = 20
 
-  const fetchRules = useCallback(() => {
+  const fetchRules = () => {
     setLoading(true)
     setError(null)
     getRules({ page, page_size: pageSize, severity: severity || undefined })
       .then((data) => { setRules(data.items); setTotal(data.total) })
       .catch((e) => { setError(e.message) })
       .finally(() => setLoading(false))
-  }, [page, pageSize, severity])
+  }
 
-  useEffect(() => { fetchRules() }, [fetchRules])
+  useEffect(() => { fetchRules() }, [page, severity])
 
   const handleToggle = async (ruleId: string, currentEnabled: boolean) => {
     setToggling(ruleId)

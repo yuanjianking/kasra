@@ -1,4 +1,4 @@
-"""Health check endpoint — includes database status."""
+"""Health check endpoint — includes database, engine, and proxy status."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ router = APIRouter(tags=["Health"])
 
 @router.get("/health")
 def health_check():
-    """Health check — returns engine status, version, and database info."""
+    """Health check — returns engine status, version, database info, and proxy status."""
     # 1. Engine status
     engine_ok = engine_service.is_initialized
     engine_info = {}
@@ -27,6 +27,12 @@ def health_check():
 
     # 2. Database status
     db_health = check_db_health()
+
+    # 3. HTTPS CONNECT proxy status
+    https_proxy = {
+        "enabled": settings.https_proxy_enabled,
+        "port": settings.https_proxy_port if settings.https_proxy_enabled else None,
+    }
 
     overall = "healthy" if (engine_ok and db_health["status"] == "healthy") else "unhealthy"
     if not engine_ok:
@@ -41,5 +47,6 @@ def health_check():
             "version": db_health.get("version"),
             "error": db_health.get("error"),
         },
+        "https_proxy": https_proxy,
         **engine_info,
     }

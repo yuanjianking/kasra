@@ -45,7 +45,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-        required: false
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]

@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.venv/
+venv/
+
+# Data files (SQLite databases + audit logs)
+data/
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+kasra-audit.jsonl
+
+# Test artifacts
+test_*.db
+test_*.db-shm
+test_*.db-wal
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Build artifacts
+*.so
+*.dylib

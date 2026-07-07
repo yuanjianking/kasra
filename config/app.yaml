@@ -1,8 +1,9 @@
 # Kasra Application Configuration
+# This file mirrors AppSettings but env vars (KASRA_APP_*) take precedence.
+
 server:
   host: "0.0.0.0"
   port: 8080
-  workers: 4
   log_level: "info"
 
 database:
@@ -12,14 +13,23 @@ database:
 security:
   api_key: "dev-api-key-change-in-production"
   jwt_secret: "change-this-to-a-random-secret"
+  rate_limit_rpm: 120
+  allowed_origins:
+    - "*"
 
 proxy:
   targets:
     - api.anthropic.com
     - api.openai.com
-  enable_connect_tunnel: true
+    - api.deepseek.com
+
+https_proxy:
+  enabled: false
+  host: "0.0.0.0"
+  port: 8443
+
+audit:
+  retention_days: 90
 
 data:
   dir: "./data"
-  audit_retention_days: 90
-  report_max_rows: 10000
