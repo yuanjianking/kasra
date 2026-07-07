@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kasra": {
+      "description": "Kasra AI Development Security Governance — input/output detection, file scanning, rule management",
+      "type": "sse",
+      "url": "http://localhost:8091/sse"
+    }
+  }
+}

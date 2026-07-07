@@ -1,0 +1,29 @@
+# =============================================================================
+# Kasra — Grafana Datasource Configuration
+# =============================================================================
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "30s"
+      httpMethod: "POST"
+
+  - name: PostgreSQL (direct)
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    user: kasra
+    secureJsonData:
+      password: "${POSTGRES_PASSWORD}"
+    jsonData:
+      database: kasra
+      sslmode: disable
+      timeInterval: "60s"
+    editable: false

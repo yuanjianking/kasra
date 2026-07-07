@@ -180,7 +180,11 @@ def create_rule(db: DBSession, rule: RuleCreate) -> RuleSchema:
 
 
 def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema | None:
-    """Update rule override (for SDK rules) or custom rule (for U-series)."""
+    """Update rule override (for SDK rules) or custom rule (for U-series).
+
+    When toggling ``enabled`` on an SDK rule, the change is pushed to the
+    live RuleEngine in-memory immediately — no restart needed.
+    """
     db_rule = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
 
     if db_rule is None:
@@ -219,6 +223,17 @@ def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema |
 
     db.commit()
     db.refresh(db_rule)
+
+    # ── Sync enabled state to live SDK engine ────────────────────────────
+    # Without this, toggling a rule in the frontend writes to DB but the
+    # in-memory SDK engine still uses the old value.
+    if update.enabled is not None:
+        try:
+            sdk_rule = engine_service.engine.get_rule(rule_id)
+            sdk_rule.enabled = db_rule.enabled
+            logger.debug("Synced SDK rule %s enabled=%s", rule_id, db_rule.enabled)
+        except (KeyError, RuleNotFoundError):
+            pass  # U-series custom rules don't exist in SDK
 
     return RuleSchema(
         id=db_rule.id,

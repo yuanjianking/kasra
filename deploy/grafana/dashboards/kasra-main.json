@@ -1,0 +1,163 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "prometheus", "id": "prometheus", "name": "Prometheus", "version": "2.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Service Health",
+      "collapse": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Engine Health",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "kasra_engine_health", "legendFormat": "Engine" }],
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Database Health",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "kasra_db_health", "legendFormat": "Database" }],
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Active Rules",
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 50 }, { "color": "green", "value": 100 } ] } } },
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "kasra_rules_enabled", "legendFormat": "Active Rules" }],
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Audit Logs Total",
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "blue", "value": null } ] } } },
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "kasra_audit_log_total", "legendFormat": "Total Logs" }],
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Active Users (24h)",
+      "datasource": "Prometheus",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } } },
+      "options": { "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "kasra_active_users_24h", "legendFormat": "Active Users" }],
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 }
+    },
+    {
+      "type": "row",
+      "title": "Detection Metrics",
+      "collapse": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+    },
+    {
+      "id": 7,
+      "type": "graph",
+      "title": "Detection Rate (per second)",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "rate(kasra_detections_total[5m])", "legendFormat": "{{ direction }} / {{ action }} / {{ severity }}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "cps" } },
+      "options": {},
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 }
+    },
+    {
+      "id": 8,
+      "type": "graph",
+      "title": "Detection Duration (P95)",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(kasra_detection_duration_ms_bucket[5m]))", "legendFormat": "{{ direction }}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "options": {},
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 }
+    },
+    {
+      "id": 9,
+      "type": "graph",
+      "title": "Total Detections by Direction",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "sum by(direction) (rate(kasra_detections_total[5m]))", "legendFormat": "{{ direction }}" }
+      ],
+      "options": {},
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 }
+    },
+    {
+      "type": "row",
+      "title": "Request Performance",
+      "collapse": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }
+    },
+    {
+      "id": 10,
+      "type": "graph",
+      "title": "HTTP Request Duration (P95)",
+      "datasource": "Prometheus",
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(kasra_request_duration_ms_bucket[5m]))", "legendFormat": "{{ method }} {{ path }}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "options": {},
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 23 }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["kasra", "security", "monitoring"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Kasra — Security Governance Dashboard",
+  "uid": "kasra-main",
+  "version": 1
+}

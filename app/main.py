@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -149,12 +150,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from app.proxy.tcp_proxy import ConnectProxy
 
         _allowed = ["api.anthropic.com", "api.openai.com", "api.deepseek.com"]
-        connect_proxy = ConnectProxy(
-            host=settings.https_proxy_host,
-            port=settings.https_proxy_port,
-            allowed_upstreams=_allowed,
-        )
-        await connect_proxy.start()
+        try:
+            connect_proxy = ConnectProxy(
+                host=settings.https_proxy_host,
+                port=settings.https_proxy_port,
+                allowed_upstreams=_allowed,
+            )
+            await connect_proxy.start()
+        except OSError:
+            logger.warning(
+                "CONNECT proxy port %d already in use "
+                "(another worker likely bound it — continuing)",
+                settings.https_proxy_port,
+            )
+            connect_proxy = None
 
     # 3. Initialize SDK RuleEngine
     logger.info("Initializing Kasra SDK RuleEngine...")
@@ -263,9 +272,11 @@ def create_app() -> FastAPI:
                     headers={"Retry-After": "60"},
                 )
 
-        # 3. API key auth (skip for public endpoints)
-        public_paths = ("/health", "/redoc", "/docs", "/openapi.json")
-        if request.url.path not in public_paths and not request.url.path.startswith(("/v1/mcp",)):
+        # 3. API key auth (skip for public endpoints + frontend static files)
+        public_paths = ("/health", "/redoc", "/docs", "/openapi.json", "/", "/favicon.svg")
+        if (request.url.path not in public_paths
+            and not request.url.path.startswith(("/v1/mcp",))
+            and not request.url.path.startswith(("/assets/",))):
             api_key = request.headers.get("X-API-Key")
             if not api_key or api_key != settings.api_key:
                 return JSONResponse(
@@ -286,21 +297,25 @@ def create_app() -> FastAPI:
     from app.api.router import api_router
     app.include_router(api_router)
 
-    # ── MCP Server (SSE transport) ──
-    try:
-        from app.mcp_server import kasra_server
-        mcp_sse_app = kasra_server.sse_app()
-        app.mount("/v1/mcp", mcp_sse_app)
-        logger.info("MCP SSE endpoint mounted at /v1/mcp/sse")
-    except Exception as exc:
-        logger.warning("MCP SSE mount skipped: %s", exc)
+    # ── MCP Server (SSE transport) — skip when running standalone MCP ──
+    if not os.environ.get("KASRA_SKIP_MCP"):
+        try:
+            from app.mcp_server import kasra_server
+            mcp_sse_app = kasra_server.sse_app()
+            app.mount("/v1/mcp", mcp_sse_app)
+            logger.info("MCP SSE endpoint mounted at /v1/mcp/sse")
+        except Exception as exc:
+            logger.warning("MCP SSE mount skipped: %s", exc)
 
-    # ── Serve Frontend Static Files (production) ──
-    frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-    if frontend_dist.exists():
-        from fastapi.staticfiles import StaticFiles
-        app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
-        logger.info("Frontend static files mounted from %s", frontend_dist)
+    # ── Serve Frontend Static Files — skip when running standalone frontend ──
+    if not os.environ.get("KASRA_SKIP_FRONTEND"):
+        frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+        if frontend_dist.exists():
+            from fastapi.staticfiles import StaticFiles
+            app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+            logger.info("Frontend static files mounted from %s", frontend_dist)
+        else:
+            logger.info("Frontend dist not found at %s — skipping", frontend_dist)
 
     return app
 

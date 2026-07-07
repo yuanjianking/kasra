@@ -1,0 +1,51 @@
+# =============================================================================
+# Kasra — Fail2Ban Jail Configuration
+# =============================================================================
+# Place in: /etc/fail2ban/jail.d/kasra.conf
+# Then: sudo systemctl restart fail2ban
+# =============================================================================
+
+[DEFAULT]
+# Ban IPs for 1 hour after 3 failures
+bantime  = 3600
+findtime = 600
+maxretry = 3
+
+# Destination email for notifications
+# mta = sendmail
+# action = %(action_mwl)s
+
+# ── Kasra API Authentication Failures ─────────────────────────────────────────
+[kasra-auth]
+enabled  = true
+port     = http,https
+filter   = kasra-auth
+logpath  = /var/log/nginx/kasra-access.log
+maxretry = 5
+findtime = 300
+bantime  = 3600
+
+# ── Kasra Rate Limit Abuse ────────────────────────────────────────────────────
+[kasra-rate-limit]
+enabled  = true
+port     = http,https
+filter   = kasra-rate-limit
+logpath  = /var/log/nginx/kasra-access.log
+maxretry = 10
+findtime = 60
+bantime  = 600
+
+# ── Nginx Proxy Abuse ─────────────────────────────────────────────────────────
+[kasra-proxy]
+enabled  = true
+port     = http,https
+filter   = kasra-proxy
+logpath  = /var/log/nginx/kasra-access.log
+maxretry = 10
+findtime = 300
+bantime  = 7200
+
+# ── SSH (keep default) ────────────────────────────────────────────────────────
+[sshd]
+enabled  = true
+port     = ssh

@@ -1,0 +1,74 @@
+# =============================================================================
+# Kasra — Pre-Commit Hooks Configuration
+# =============================================================================
+# Usage:
+#   pip install pre-commit
+#   pre-commit install
+#   pre-commit run --all-files
+# =============================================================================
+repos:
+  # ── Basic file checks ──────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-symlinks
+      - id: destroyed-symlinks
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # ── Python linting (ruff) ──────────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.4
+    hooks:
+      - id: ruff
+        args: [--fix, --select=E,F,I,N,W,S]
+      - id: ruff-format
+
+  # ── Python type checking (mypy) ────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        language: system  # Use project's virtualenv
+        args: [--python-version=3.11, --ignore-missing-imports]
+        files: ^app/
+
+  # ── Security scanning ──────────────────────────────────────────────────────
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.8
+    hooks:
+      - id: bandit
+        args: [-ll, -x, tests]
+        files: ^app/
+
+  # ── Dockerfile linting ─────────────────────────────────────────────────────
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint
+        args: [--failure-threshold, warning]
+        exclude: ^frontend/
+
+  # ── Secrets detection ──────────────────────────────────────────────────────
+  - repo: https://github.com/ibm/detect-secrets
+    rev: 0.13.1+ibm.61.dss
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: >
+          (?x)^(
+            .env.example|
+            .env.production|
+            tests/.*|
+            deploy/.*
+          )$

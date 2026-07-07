@@ -1,0 +1,70 @@
+# =============================================================================
+# Kasra — Prometheus Configuration (Enterprise)
+# =============================================================================
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    monitor: "kasra"
+    environment: "production"
+
+# ── Alertmanager configuration ──────────────────────────────────────────────
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# ── Rule files ──────────────────────────────────────────────────────────────
+rule_files:
+  # - "alerts.yml"
+
+# ── Scrape targets ──────────────────────────────────────────────────────────
+scrape_configs:
+  # ── Kasra application metrics ──────────────────────────────────────────────
+  - job_name: "kasra"
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets:
+          - "kasra:8080"           # Docker compose service name
+          # - "localhost:8080"     # Direct deployment
+          # - "10.0.1.10:8080"    # Production host
+    labels:
+      service: "kasra-app"
+    # Basic auth if configured
+    # basic_auth:
+    #   username: prometheus
+    #   password: ${PROMETHEUS_PASSWORD}
+    # Relabel to add useful metadata
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: "(.*):.*"
+        replacement: "${1}"
+
+  # ── PostgreSQL exporter ─────────────────────────────────────────────────────
+  - job_name: "postgresql"
+    static_configs:
+      - targets:
+          - "postgres-exporter:9187"
+    labels:
+      service: "kasra-postgres"
+
+  # ── Node exporter (host-level metrics) ──────────────────────────────────────
+  - job_name: "node"
+    static_configs:
+      - targets:
+          - "node-exporter:9100"
+    labels:
+      service: "kasra-host"
+
+  # ── cAdvisor (container metrics) ────────────────────────────────────────────
+  - job_name: "cadvisor"
+    static_configs:
+      - targets:
+          - "cadvisor:8080"
+    labels:
+      service: "kasra-containers"

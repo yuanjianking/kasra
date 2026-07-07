@@ -39,6 +39,9 @@ def _act(val: object) -> str:
 # FastMCP Server instance
 # ---------------------------------------------------------------------------
 
+_mcp_host = os.environ.get("KASRA_MCP_HOST", "127.0.0.1")
+_mcp_port = int(os.environ.get("KASRA_MCP_PORT", "8090"))
+
 kasra_server = FastMCP(
     name="Kasra Security Scanner",
     instructions=(
@@ -49,8 +52,8 @@ kasra_server = FastMCP(
         "Use these tools BEFORE sending content to an AI model, and AFTER "
         "receiving AI-generated content."
     ),
-    host="0.0.0.0",
-    port=8931,
+    host=_mcp_host,
+    port=_mcp_port,
     sse_path="/sse",
     message_path="/messages/",
 )
@@ -338,7 +341,26 @@ def _format_result(result: Any, direction: str) -> str:
 # ===========================================================================
 
 if __name__ == "__main__":
-    # Ensure engine is initialized before accepting MCP connections
+    """Standalone MCP SSE server entry point.
+
+    When run directly (python -m app.mcp_server), starts an independent
+    SSE server on the configured port (default 8090).
+    """
+    import sys
+    import os
+
+    port = int(os.environ.get("KASRA_MCP_PORT", "8090"))
+    host = os.environ.get("KASRA_MCP_HOST", "0.0.0.0")
+
+    # Initialize engine + database before accepting connections
+    from app.database import init_db, SessionLocal
+    from app.models.audit_log import AuditLog  # noqa: F401
+    from app.models.rule_config import RuleConfig  # noqa: F401
+    from app.models.user_behavior import UserBehavior  # noqa: F401
+    from app.models.user import User  # noqa: F401
+
+    init_db()
     _ensure_engine()
-    print("Kasra MCP Server starting (stdio transport)...", file=__import__("sys").stderr)
-    kasra_server.run()
+
+    print(f"Kasra MCP Server starting on {host}:{port} (SSE)...", file=sys.stderr)
+    kasra_server.run(transport="sse")

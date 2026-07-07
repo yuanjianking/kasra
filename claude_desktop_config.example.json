@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kasra": {
+      "description": "Kasra AI Development Security Governance",
+      "type": "sse",
+      "url": "http://localhost:8080/v1/mcp/sse"
+    }
+  }
+}

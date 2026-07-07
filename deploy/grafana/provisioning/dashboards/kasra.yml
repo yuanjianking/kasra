@@ -1,0 +1,17 @@
+# =============================================================================
+# Kasra — Grafana Dashboard Provisioning
+# =============================================================================
+apiVersion: 1
+
+providers:
+  - name: "Kasra Dashboards"
+    orgId: 1
+    folder: "Kasra"
+    folderUid: "kasra"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 60
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: true

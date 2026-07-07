@@ -1,0 +1,92 @@
+# =============================================================================
+# Kasra — Prometheus Alert Rules (Enterprise)
+# =============================================================================
+groups:
+  - name: kasra_alerts
+    interval: 30s
+    rules:
+      # ── Service health ─────────────────────────────────────────────────────
+      - alert: KasraDown
+        expr: up{job="kasra"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kasra service is down"
+          description: "Kasra instance {{ $labels.instance }} has been unreachable for >1m."
+
+      - alert: KasraEngineUnhealthy
+        expr: kasra_engine_health == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kasra detection engine is unhealthy"
+          description: "The RuleEngine on {{ $labels.instance }} is not operational."
+
+      - alert: KasraDatabaseDown
+        expr: kasra_db_health == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kasra database is unhealthy"
+          description: "Database on {{ $labels.instance }} is unreachable or corrupted."
+
+      # ── Detection anomalies ────────────────────────────────────────────────
+      - alert: HighDetectionRate
+        expr: rate(kasra_detections_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High detection rate"
+          description: "Detection rate is {{ $value }}/s — possible attack in progress."
+
+      - alert: HighBlockRate
+        expr: rate(kasra_detections_blocked_total[5m]) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High block rate"
+          description: "Block rate is {{ $value }}/s — credential leak attack suspected."
+
+      # ── Rule health ────────────────────────────────────────────────────────
+      - alert: LowActiveRules
+        expr: kasra_rules_enabled < 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low active rule count"
+          description: "Only {{ $value }} rules enabled (expected >= 50)."
+
+      # ── Performance ────────────────────────────────────────────────────────
+      - alert: SlowDetection
+        expr: histogram_quantile(0.95, rate(kasra_detection_duration_ms_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Detection latency is high"
+          description: "P95 detection latency is {{ $value }}ms (threshold: 1000ms)."
+
+      - alert: SlowRequests
+        expr: histogram_quantile(0.95, rate(kasra_request_duration_ms_bucket[5m])) > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API latency is high"
+          description: "P95 request latency is {{ $value }}ms (threshold: 5000ms)."
+
+      # ── Resource exhaustion ────────────────────────────────────────────────
+      - alert: DatabaseConnectionsExhausted
+        expr: sum(kasra_db_connections) > 80
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connections near limit"
+          description: "Current: {{ $value }} (limit: 80% of pool)"
