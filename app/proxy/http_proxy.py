@@ -272,3 +272,36 @@ async def proxy_request(
             "body": json.dumps({"error": f"Upstream connection failed: {str(e)}"}).encode(),
             "detection": None,
         }
+
+
+async def handle_connect(
+    host: str,
+    headers: dict[str, str],
+) -> dict[str, Any]:
+    """Handle HTTP CONNECT tunnel requests.
+
+    NOTE: FastAPI/uvicorn cannot do raw TCP tunneling directly.
+    This returns a proper error explaining the limitation and
+    directs users to use the MCP integration instead.
+
+    For full transparent proxy support, deploy a dedicated proxy
+    (nginx, squid, mitmproxy) in front of Kasra.
+    """
+    logger.warning("CONNECT tunnel requested but not supported: %s", host)
+    return {
+        "status_code": 501,
+        "headers": {"content-type": "application/json"},
+        "body": json.dumps({
+            "error": "CONNECT tunnel not supported in this mode",
+            "message": (
+                "HTTP CONNECT (HTTPS proxy) requires a TCP-level proxy. "
+                "Use MCP integration or deploy nginx/squid as a forward proxy."
+            ),
+            "supported_methods": [
+                "REST API: POST /v1/scan/input, POST /v1/scan/output",
+                "MCP: ws/sse at /v1/mcp/sse",
+                "CLI: kasra-scan review ./src",
+            ],
+        }).encode(),
+        "detection": None,
+    }

@@ -7,6 +7,7 @@ import time
 
 from sqlalchemy.orm import Session as DBSession
 
+from app.metrics import detections_total, detection_duration_ms
 from app.models.audit_log import AuditLog
 from app.models.user_behavior import UserBehavior
 from app.services.engine_service import engine_service
@@ -152,7 +153,7 @@ def scan_input(
         content=content,
     )
 
-    return _to_scan_response(result)
+    return _to_scan_response(result, direction="input")
 
 
 def scan_output(
@@ -176,7 +177,7 @@ def scan_output(
         content=content,
     )
 
-    return _to_scan_response(result)
+    return _to_scan_response(result, direction="output")
 
 
 def scan_batch(
@@ -251,8 +252,16 @@ def scan_batch(
     )
 
 
-def _to_scan_response(result: "kasra.models.result.AggregatedResult") -> ScanResponse:
-    """Convert SDK AggregatedResult to API ScanResponse."""
+def _to_scan_response(result: "kasra.models.result.AggregatedResult", direction: str = "unknown") -> ScanResponse:
+    """Convert SDK AggregatedResult to API ScanResponse and record metrics."""
+    # Record Prometheus metrics
+    if result.triggered_rules:
+        for dr in result.triggered_rules:
+            sev = dr.severity.value if hasattr(dr.severity, "value") else str(dr.severity)
+            act = dr.action.value if hasattr(dr.action, "value") else str(dr.action)
+            detections_total.labels(direction=direction, action=act, severity=sev).inc()
+    detection_duration_ms.labels(direction=direction).observe(result.execution_time_ms)
+
     triggered = []
     for dr in result.triggered_rules:
         triggered.append(TriggeredRuleSchema(

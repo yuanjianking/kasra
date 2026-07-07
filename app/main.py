@@ -7,6 +7,8 @@ sets up middleware, and registers all API route handlers.
 from __future__ import annotations
 
 import logging
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -17,8 +19,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import init_db, get_db_type
+from app.database import init_db, get_db_type, check_db_health
 from app.services.engine_service import engine_service
+from app.metrics import (
+    PrometheusMiddleware,
+    metrics_endpoint,
+    rules_loaded,
+    rules_active,
+    engine_health,
+    db_health,
+    audit_log_total,
+    active_users_24h,
+    detections_total,
+)
 
 logger = logging.getLogger("kasra")
 
@@ -30,6 +43,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting Kasra application...")
     from app.config import validate_settings
     validate_settings(settings)
+
+    # Schedule periodic audit log cleanup
+    import threading as _threading
+
+    def _cleanup_audit_logs():
+        """Periodically delete audit logs older than retention_days."""
+        import time as _time
+        while True:
+            _time.sleep(3600)  # Check every hour
+            try:
+                from app.database import SessionLocal
+                from app.models.audit_log import AuditLog
+                from datetime import datetime, timedelta, timezone
+                db = SessionLocal()
+                cutoff = datetime.now(timezone.utc) - timedelta(days=settings.audit_retention_days)
+                deleted = db.query(AuditLog).filter(AuditLog.timestamp < cutoff).delete()
+                if deleted:
+                    db.commit()
+                    logger.info("Cleaned up %d audit log entries older than %d days", deleted, settings.audit_retention_days)
+                db.close()
+            except Exception:
+                pass
+
+    cleanup_thread = _threading.Thread(target=_cleanup_audit_logs, daemon=True)
+    cleanup_thread.start()
+    logger.info("Audit log cleanup scheduled every hour (retention: %d days)", settings.audit_retention_days)
 
     # 1. Initialize database
     logger.info("Initializing database...")
@@ -106,12 +145,46 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         engine_service.engine.rule_count,
     )
 
+    # Initialize Prometheus metrics
+    if engine_service.is_initialized:
+        engine = engine_service.engine
+        rules_loaded.set(engine.rule_count)
+        rules_active.set(len([r for r in engine.get_rules() if r.enabled]))
+        engine_health.set(1)
+    else:
+        engine_health.set(0)
+
+    # Database health
+    db_status = check_db_health()
+    db_health.set(1 if db_status.get("status") == "healthy" else 0)
+
     yield
 
     # ── Shutdown ──
     logger.info("Shutting down Kasra application...")
     engine_service.shutdown()
     logger.info("Shutdown complete.")
+
+
+class RateLimiter:
+    """Simple in-memory rate limiter (sliding window)."""
+    def __init__(self, requests_per_minute: int = 60):
+        self.rpm = requests_per_minute
+        self._windows: dict[str, list[float]] = defaultdict(list)
+
+    def check(self, key: str) -> tuple[bool, int]:
+        now = time.monotonic()
+        window = now - 60.0  # 1 minute ago
+        # Prune old entries
+        self._windows[key] = [t for t in self._windows[key] if t > window]
+        count = len(self._windows[key])
+        if count >= self.rpm:
+            return False, self.rpm
+        self._windows[key].append(now)
+        return True, self.rpm - count - 1
+
+# Default: 120 requests/minute (can be overridden via KASRA_APP_RATE_LIMIT env var)
+rate_limiter = RateLimiter(requests_per_minute=settings.rate_limit_rpm)
 
 
 def create_app() -> FastAPI:
@@ -128,21 +201,35 @@ def create_app() -> FastAPI:
     # ── Middleware ──
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,  # Changed from True — incompatible with allow_origins=["*"]
+        allow_origins=settings.allowed_origins,  # From config
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ── Prometheus Metrics Middleware ──
+    app.add_middleware(PrometheusMiddleware)
 
     # ── Security Middleware (body size limit + API key auth) ──
     MAX_BODY_SIZE = 10 * 1024 * 1024  # 10 MB
 
     @app.middleware("http")
     async def security_middleware(request: Request, call_next):
-        # 1. Body size limit (prevent OOM attacks)
+        # 1a. Body size limit (prevent OOM attacks)
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > MAX_BODY_SIZE:
             return JSONResponse(status_code=413, content={"error": f"Request body too large. Max: {MAX_BODY_SIZE} bytes"})
+
+        # 1b. Rate limiting (skip for MCP/static paths)
+        if not request.url.path.startswith(("/v1/mcp",)):
+            client_ip = request.client.host if request.client else "unknown"
+            allowed, remaining = rate_limiter.check(client_ip)
+            if not allowed:
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": "Rate limit exceeded. Try again later."},
+                    headers={"Retry-After": "60"},
+                )
 
         # 2. API key auth (skip for public endpoints)
         public_paths = ("/health", "/redoc", "/docs", "/openapi.json")
@@ -155,6 +242,13 @@ def create_app() -> FastAPI:
                 )
 
         return await call_next(request)
+
+    # ── Prometheus Metrics endpoint (no auth required) ──
+    from starlette.requests import Request as StarletteRequest
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics(request: StarletteRequest):
+        return metrics_endpoint(request)
 
     # ── Register Routers ──
     from app.api.router import api_router

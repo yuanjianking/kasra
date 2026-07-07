@@ -22,7 +22,7 @@ logger = logging.getLogger("kasra.api.proxy")
 router = APIRouter(prefix="/v1/proxy", tags=["Proxy"])
 
 
-@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
+@router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT"])
 async def proxy_handler(path: str, request: Request):
     """Proxy endpoint — forwards requests to upstream AI APIs with security scanning.
 
@@ -31,6 +31,19 @@ async def proxy_handler(path: str, request: Request):
 
     Runs input detection on request content and output detection on responses.
     """
+    # Handle CONNECT (HTTPS tunnel)
+    if request.method == "CONNECT":
+        from app.proxy.http_proxy import handle_connect
+        result = await handle_connect(
+            host=path,
+            headers=dict(request.headers.items()),
+        )
+        return Response(
+            content=result.get("body"),
+            status_code=result.get("status_code", 501),
+            headers=result.get("headers", {}),
+        )
+
     body = await request.body()
 
     # Forward headers, preserving incoming auth headers

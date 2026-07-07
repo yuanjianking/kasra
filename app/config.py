@@ -34,6 +34,15 @@ class AppSettings(BaseSettings):
     # ── Proxy ──
     proxy_targets: str = "api.anthropic.com,api.openai.com"
 
+    # ── Rate Limiting ──
+    rate_limit_rpm: int = 120  # Requests per minute per IP
+
+    # ── CORS ──
+    allowed_origins: list[str] = ["*"]  # Change to specific origins in production
+
+    # ── Audit ──
+    audit_retention_days: int = 90  # Auto-delete audit logs older than this
+
     # ── Paths ──
     data_dir: str = "./data"
     config_dir: str = "./config"

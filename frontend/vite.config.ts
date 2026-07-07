@@ -10,4 +10,15 @@ export default defineConfig({
       '/health': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 400,
+  },
 })

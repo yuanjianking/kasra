@@ -1,32 +1,60 @@
-# React + TypeScript + Vite
+# Kasra Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Web dashboard for the Kasra AI Development Security Governance Platform.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Framework:** React 19 + TypeScript
+- **Build:** Vite 5
+- **Styling:** Tailwind CSS 3
+- **Charts:** Recharts
+- **Linting:** Oxlint
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install dependencies
+npm install
 
-## Expanding the Oxlint configuration
+# Development (requires backend on port 8080)
+npm run dev
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+# Production build
+npm run build
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# Preview production build
+npm run preview
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Project Structure
+
+```
+src/
+├── api/client.ts          # API client with auto-auth headers
+├── auth.tsx               # Auth context (API key in localStorage)
+├── App.tsx                # Layout + routing
+├── pages/
+│   ├── Login.tsx          # API key login
+│   ├── Dashboard.tsx      # Stats, trends, top rules/users
+│   ├── AuditLogs.tsx      # Paginated audit log viewer
+│   ├── Rules.tsx          # Rule list with enable/disable toggle
+│   └── UserBehavior.tsx   # User activity analysis
+└── main.tsx               # Entry point
+```
+
+## Configuration
+
+The development server proxies API requests to `http://localhost:8080` via Vite config.
+
+In production, the built assets are served by the FastAPI backend directly from `frontend/dist/`.
+
+## Build
+
+```bash
+npm run build    # Output: dist/
+```
+
+## Auth
+
+All API calls automatically include the `X-API-Key` header from `localStorage('kasra_api_key')`.
+The login page stores the key after successful verification against the `/health` endpoint.

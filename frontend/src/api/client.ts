@@ -1,8 +1,16 @@
 const API_BASE = '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+
+  // Add API key from localStorage if available
+  const apiKey = typeof window !== 'undefined' ? localStorage.getItem('kasra_api_key') : null
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: { ...headers, ...options?.headers as Record<string, string> },
     ...options,
   });
   if (!res.ok) {
