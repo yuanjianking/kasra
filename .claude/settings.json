@@ -1,9 +1,73 @@
 {
-  "mcpServers": {
-    "kasra": {
-      "description": "Kasra AI Development Security Governance — input/output detection, file scanning, rule management",
-      "type": "sse",
-      "url": "http://localhost:8091/sse"
-    }
+  "env": {
+    "KASRA_HOOK_API_KEY": "kasra-dev-api-key-change-in-prod"
+  },
+   "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/kasra-hook.sh input",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/kasra-hook.sh input",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/kasra-hook.sh input",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/kasra-hook.sh output",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/kasra-hook.sh output",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/kasra-hook.sh output",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

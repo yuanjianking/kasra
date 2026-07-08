@@ -7,36 +7,17 @@ metadata:
 
 # Kasra Code Review
 
-When a user types `/code-review [path]`, use the Kasra security detection engine to perform a security review of the code repository.
+When a user types `/code-review [path]`, use the Kasra MCP tools to perform a security review of the code repository.
 
-## Execution Methods (priority order)
+## Execution Method (MCP only)
 
-### Method 1: Direct Python SDK (Recommended — fastest, no server needed)
+Call the `kasra_scan_file` MCP tool with the user-specified path (defaults to `.`):
 
-Run detection by calling the `kasra` SDK RuleEngine directly:
+- Tool: `kasra_scan_file`
+- Parameter `path`: the directory or file to scan
+- Returns: JSON with `scan_path`, `files_scanned`, `total_findings`, `findings`
 
-```python
-from kasra import RuleEngine
-
-eng = RuleEngine()
-eng.load_rules()
-result = eng.scan_file("<path>")       # Single file
-# or
-results = eng.scan_directory("<path>")  # Directory
-```
-
-Then parse `result.triggered_rules` and format as the report below.
-
-### Method 2: MCP Tool (Kasra MCP configured in settings.json)
-
-If the Kasra MCP server is configured (SSE at localhost:8091), call `kasra_scan_file`:
-- Parameter `path`: the user-specified directory, defaults to `.`
-
-### Method 3: CLI (fallback)
-
-```bash
-kasra-scan review <path> --json
-```
+Parse the returned findings and format as the report below. If the MCP server is unreachable, report an error and suggest checking the MCP server status.
 
 ## Output Format
 
