@@ -5,11 +5,10 @@
    "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/kasra-hook.sh input",
+            "command": "bash hooks/kasra-hook.sh input",
             "timeout": 10
           }
         ]
@@ -21,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/kasra-hook.sh input",
+            "command": "bash hooks/kasra-hook.sh input",
             "timeout": 5
           }
         ]
@@ -31,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/kasra-hook.sh input",
+            "command": "bash hooks/kasra-hook.sh input",
             "timeout": 10
           }
         ]
@@ -43,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/kasra-hook.sh output",
+            "command": "bash hooks/kasra-hook.sh output",
             "timeout": 15
           }
         ]
@@ -53,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/kasra-hook.sh output",
+            "command": "bash hooks/kasra-hook.sh output",
             "timeout": 10
           }
         ]
@@ -63,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/kasra-hook.sh output",
+            "command": "bash hooks/kasra-hook.sh output",
             "timeout": 10
           }
         ]

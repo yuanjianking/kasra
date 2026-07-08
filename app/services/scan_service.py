@@ -130,6 +130,13 @@ def _update_user_behavior(
     if not user_id:
         return
 
+    # Auto-create user record if first time seeing this user_id
+    from app.models.user import User
+    existing_user = db.query(User).filter(User.username == user_id).first()
+    if existing_user is None:
+        db.add(User(username=user_id, role="user", is_active=True))
+        db.flush()
+
     today = date.today()
     now = datetime.utcnow().time()
 
