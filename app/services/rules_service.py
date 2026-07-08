@@ -43,7 +43,7 @@ def list_rules(
 
     db_rules = {r.id: r for r in db_query.all()}
 
-    # 3. Merge: SDK rules first, then custom rules
+    # 3. Merge: SDK I/O rules + scanner rules + custom rules
     merged: list[RuleSchema] = []
 
     for rule in sdk_rules:
@@ -60,6 +60,33 @@ def list_rules(
             is_custom=False,
             source="sdk",
         ))
+
+    # 3b. Add scanner rules (SEC and IAC series) — loaded from the SDK's
+    #     CodeReviewScanner which reads _code-review-rules.json.
+    #     These rules run during scan_file/scan_directory.
+    try:
+        from kasra.scanner import CodeReviewScanner
+        _scanner = CodeReviewScanner()
+        _scanner.load_rules()
+        for _r in _scanner.rules:
+            _rid = _r.get("id", "")
+            if not _rid:
+                continue
+            db_override = db_rules.get(_rid)
+            merged.append(RuleSchema(
+                id=_rid,
+                name=_r.get("name", _rid),
+                description=_r.get("description", ""),
+                category=_r.get("category", "code_security"),
+                severity=_r.get("severity", "P1"),
+                action=_r.get("action", "warn"),
+                pattern=None,
+                enabled=db_override.enabled if db_override else True,
+                is_custom=False,
+                source="sdk",
+            ))
+    except ImportError:
+        pass
 
     # Add user custom rules
     for rid, r in db_rules.items():
@@ -118,6 +145,29 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
             source="sdk",
         )
     except (KeyError, RuleNotFoundError):
+        pass
+
+    # Check scanner rules (SEC/IAC series) — via CodeReviewScanner
+    try:
+        from kasra.scanner import CodeReviewScanner
+        _s = CodeReviewScanner()
+        _s.load_rules()
+        for _r in _s.rules:
+            if _r.get("id") == rule_id:
+                db_override = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
+                return RuleSchema(
+                    id=_r["id"],
+                    name=_r.get("name", rule_id),
+                    description=_r.get("description", ""),
+                    category=_r.get("category", "code_security"),
+                    severity=_r.get("severity", "P1"),
+                    action=_r.get("action", "warn"),
+                    pattern=None,
+                    enabled=db_override.enabled if db_override else True,
+                    is_custom=False,
+                    source="sdk",
+                )
+    except ImportError:
         pass
 
     # Check DB custom rules
@@ -193,9 +243,23 @@ def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema |
             return None  # U-series must be created first
 
         # Check if it's a valid SDK rule
+        is_valid = False
         try:
             engine_service.engine.get_rule(rule_id)
+            is_valid = True
         except (KeyError, RuleNotFoundError):
+            pass
+
+        # Also check scanner rules (SEC series)
+        if not is_valid:
+            try:
+                from kasra.scanner.checkers import init_checkers
+                if rule_id in init_checkers():
+                    is_valid = True
+            except ImportError:
+                pass
+
+        if not is_valid:
             return None
 
         db_rule = RuleConfig(

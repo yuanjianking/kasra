@@ -15,7 +15,7 @@ router = APIRouter(prefix="/v1/rules", tags=["Rules"])
 @router.get("")
 def list_rules(
     category: str | None = Query(default=None),
-    severity: str | None = Query(default=None, pattern=r"^(P0|P1|P2)$"),
+    severity: str | None = Query(default=None),
     enabled_only: bool | None = Query(default=None),
     custom_only: bool | None = Query(default=None),
     page: int = Query(default=1, ge=1),
