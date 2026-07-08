@@ -27,9 +27,9 @@ results = eng.scan_directory("<path>")  # Directory
 
 Then parse `result.triggered_rules` and format as the report below.
 
-### Method 2: MCP Tool (if Kasra Server is running)
+### Method 2: MCP Tool (Kasra MCP configured in settings.json)
 
-If the Kasra MCP SSE endpoint is registered at `/v1/mcp/sse`, invoke `kasra_scan_file`:
+If the Kasra MCP server is configured (SSE at localhost:8091), call `kasra_scan_file`:
 - Parameter `path`: the user-specified directory, defaults to `.`
 
 ### Method 3: CLI (fallback)

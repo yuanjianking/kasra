@@ -7,7 +7,7 @@
 # =============================================================================
 set -euo pipefail
 
-KASRA_URL="${KASRA_HEALTHCHECK_URL:-http://localhost:8080}"
+KASRA_URL="${KASRA_HEALTHCHECK_URL:-http://localhost:8090}"
 TIMEOUT="${KASRA_HEALTHCHECK_TIMEOUT:-10}"
 API_KEY="${KASRA_API_KEY:-}"
 

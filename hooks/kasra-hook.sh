@@ -3,12 +3,13 @@
 # Kasra Hook Helper — Security detection for Claude Code Hooks
 # ===========================================================================
 # Architecture:
-#   ┌─ Primary: HTTP API → localhost:8080 (Docker Kasra server)
-#   │  The MCP / REST API share the same detection engine.
+#   ┌─ Primary: HTTP API → localhost:8090 (Docker Kasra API service)
+#   │  The hooks call the REST API directly (fast, real-time detection).
 #   │  Docker runs 24/7, so this is always available.
 #   │
 #   └─ Fallback: Direct Python SDK (no server needed)
 #      Uses kasra-sdk RuleEngine inline.
+# ===========================================================================
 #
 # Usage:
 #   echo "some text" | kasra-hook input     # Input detection (can block)
@@ -27,14 +28,14 @@ if [ -z "$CONTENT" ]; then
 fi
 
 # Kasra server endpoint (Docker)
-KASRA_API="${KASRA_API_URL:-http://localhost:8080}"
+KASRA_API="${KASRA_API_URL:-http://localhost:8090}"
 KASRA_API_TIMEOUT=5
 KASRA_API_KEY="${KASRA_HOOK_API_KEY:-}"
 HAS_CURL=1
 command -v curl &>/dev/null || HAS_CURL=0
 
 # ── Detection via HTTP API (primary) ────────────────────────────────────────
-# The Docker container runs 24/7 at localhost:8080.
+# The Docker container runs 24/7 at localhost:8090.
 # This is the same detection engine that powers MCP.
 
 api_detect() {

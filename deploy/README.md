@@ -24,8 +24,8 @@ export KASRA_JWT_SECRET=$(openssl rand -hex 64)
 docker compose --profile production up -d
 
 # 3. Verify
-curl -f http://localhost:8080/health
-curl -f http://localhost:8080/v1/rules \
+curl -f http://localhost:8090/health
+curl -f http://localhost:8090/v1/rules \
     -H "X-API-Key: $KASRA_API_KEY"
 
 # 4. (Optional) Start monitoring stack
@@ -78,7 +78,7 @@ cp deploy/fail2ban/jail.local /etc/fail2ban/jail.d/kasra.conf
 systemctl restart fail2ban
 
 # 9. Verify
-curl -f http://localhost:8080/health
+curl -f http://localhost:8090/health
 journalctl -u kasra -f
 ```
 
@@ -249,7 +249,7 @@ make clean         # Remove build artifacts
 
 ```bash
 # Basic health (no auth required)
-curl http://localhost:8080/health
+curl http://localhost:8090/health
 
 # Expected response:
 {
@@ -262,5 +262,5 @@ curl http://localhost:8080/health
 }
 
 # Authenticated API check
-curl -H "X-API-Key: $KASRA_API_KEY" http://localhost:8080/v1/rules
+curl -H "X-API-Key: $KASRA_API_KEY" http://localhost:8090/v1/rules
 ```
