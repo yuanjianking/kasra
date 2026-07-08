@@ -1,6 +1,7 @@
 {
   "env": {
-    "KASRA_HOOK_API_KEY": "kasra-dev-api-key-change-in-prod"
+    "KASRA_HOOK_API_KEY": "kasra-dev-api-key-change-in-prod",
+    "KASRA_SKIP_HOOK": "1"
   },
    "hooks": {
     "UserPromptSubmit": [

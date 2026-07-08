@@ -2,6 +2,13 @@
 # ===========================================================================
 # Kasra Hook — Security detection for Claude Code Hooks
 # Uses Kasra MCP Server HTTP API
+# NOTE: Set KASRA_SKIP_HOOK=1 to bypass (for internal Kasra dev work)
+# ===========================================================================
+
+# Allow internal development bypass
+if [ "${KASRA_SKIP_HOOK:-0}" = "1" ]; then
+    exit 0
+fi
 #
 # Events:
 #   UserPromptSubmit → exit 2 (stderr shown in dialog)
