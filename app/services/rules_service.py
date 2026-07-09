@@ -17,6 +17,57 @@ from app.services.engine_service import engine_service
 logger = logging.getLogger("kasra.service.rules")
 
 
+def sync_disabled_rules_from_db(db: DBSession) -> None:
+    """Sync disabled rule states from the database to the in-memory engine.
+
+    Called once at startup after ``engine_service.initialize()`` so that
+    rules previously disabled via the frontend remain disabled across restarts.
+
+    Handles both I/O rules (I-xx, O-xx → ``engine.disable_rule()``) and
+    code review rules (SEC-xx, IAC-xx → ``engine.disable_code_review_rule()``).
+    """
+    engine = engine_service.engine
+
+    # Query all DB override records where the user explicitly disabled a rule
+    disabled_records = db.query(RuleConfig).filter(
+        RuleConfig.enabled == False,  # noqa: E712
+        RuleConfig.is_custom == False,
+    ).all()
+
+    if not disabled_records:
+        return
+
+    # Pre-warm the code review scanner so its disabled_rule_ids set exists
+    try:
+        engine.get_code_review_rules()
+    except Exception:
+        pass
+
+    io_count = 0
+    cr_count = 0
+
+    for record in disabled_records:
+        rule_id = record.id
+        group = _rule_group(rule_id)
+
+        try:
+            if group == "code_review":
+                engine.disable_code_review_rule(rule_id)
+                cr_count += 1
+            else:
+                engine.disable_rule(rule_id)
+                io_count += 1
+        except (RuleNotFoundError, ValueError):
+            # Rule may have been removed from the SDK — skip silently
+            pass
+
+    if cr_count or io_count:
+        logger.info(
+            "Synced disabled state from DB: %d I/O rules, %d code review rules",
+            io_count, cr_count,
+        )
+
+
 def _rule_group(rule_id: str) -> str:
     """Determine the display group of a rule from its ID.
 

@@ -173,6 +173,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         engine_service.engine.rule_count,
     )
 
+    # 3b. Sync disabled rule states from database to in-memory engine
+    #     so that rules disabled via the frontend persist across restarts.
+    try:
+        from app.database import SessionLocal
+        from app.services.rules_service import sync_disabled_rules_from_db
+        sync_db = SessionLocal()
+        sync_disabled_rules_from_db(sync_db)
+        sync_db.close()
+    except Exception:
+        logger.exception("Failed to sync disabled rules from DB")
+
     # Initialize Prometheus metrics
     if engine_service.is_initialized:
         engine = engine_service.engine
