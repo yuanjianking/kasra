@@ -13,6 +13,7 @@ from typing import Any
 
 from kasra import RuleEngine
 from kasra.models.result import AggregatedResult
+from kasra.scanner.models import CodeReviewResult
 
 from app.config import settings
 
@@ -127,23 +128,23 @@ class EngineService:
         kwargs = {k: v for k, v in context_kwargs.items() if v is not None}
         return self.engine.detect_output(content, **kwargs)
 
-    def scan_file(
+    def review_code(
         self,
-        file_path: str | os.PathLike,
-        **context_kwargs: Any,
-    ) -> AggregatedResult:
-        """Scan a single file for rule violations."""
-        kwargs = {k: v for k, v in context_kwargs.items() if v is not None}
-        return self.engine.scan_file(file_path, **kwargs)
+        path: str | os.PathLike,
+    ) -> CodeReviewResult:
+        """Run code review security scan on a file or directory.
 
-    def scan_directory(
-        self,
-        dir_path: str | os.PathLike,
-        **context_kwargs: Any,
-    ) -> list[AggregatedResult]:
-        """Scan all files in a directory."""
-        kwargs = {k: v for k, v in context_kwargs.items() if v is not None}
-        return self.engine.scan_directory(dir_path, **kwargs)
+        Uses the SDK ``RuleEngine.review_code()`` which scans for
+        SEC/IAC code security rules (SQL injection, XSS, hardcoded
+        secrets, Docker/K8s misconfigurations, etc.).
+
+        Args:
+            path: Path to a file or directory to scan.
+
+        Returns:
+            A ``CodeReviewResult`` with all findings.
+        """
+        return self.engine.review_code(path)
 
     def track_behavior(
         self,

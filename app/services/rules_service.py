@@ -8,13 +8,27 @@ from typing import Any
 
 from sqlalchemy.orm import Session as DBSession
 
-from kasra.exceptions.errors import RuleNotFoundError
+from kasra.exceptions import RuleNotFoundError
 
 from app.models.rule_config import RuleConfig
 from app.schemas.rules import RuleCreate, RuleSchema, RuleUpdate
 from app.services.engine_service import engine_service
 
 logger = logging.getLogger("kasra.service.rules")
+
+
+def _rule_group(rule_id: str) -> str:
+    """Determine the display group of a rule from its ID.
+
+    Returns ``"input"``, ``"output"``, or ``"code_review"``.
+    """
+    prefix = rule_id.split("-", 1)[0] if "-" in rule_id else rule_id
+    if prefix == "I":
+        return "input"
+    if prefix == "O":
+        return "output"
+    # SEC, IAC, ARCH — all code review rules
+    return "code_review"
 
 
 def list_rules(
@@ -24,6 +38,7 @@ def list_rules(
     severity: str | None = None,
     enabled_only: bool | None = None,
     custom_only: bool | None = None,
+    group: str | None = None,
     page: int = 1,
     page_size: int = 100,
 ) -> dict[str, Any]:
@@ -59,20 +74,19 @@ def list_rules(
             enabled=db_override.enabled if db_override else rule.enabled,
             is_custom=False,
             source="sdk",
+            group=_rule_group(rule.id),
         ))
 
     # 3b. Add scanner rules (SEC and IAC series) — loaded from the SDK's
-    #     CodeReviewScanner which reads _code-review-rules.json.
-    #     These rules run during scan_file/scan_directory.
+    #     get_code_review_rules() which reads _code-review-rules.json.
+    #     These rules run during review_code().
     try:
-        from kasra.scanner import CodeReviewScanner
-        _scanner = CodeReviewScanner()
-        _scanner.load_rules()
-        for _r in _scanner.rules:
+        for _r in engine_service.engine.get_code_review_rules():
             _rid = _r.get("id", "")
             if not _rid:
                 continue
             db_override = db_rules.get(_rid)
+            disabled_ids = engine_service.engine.disabled_code_review_rule_ids
             merged.append(RuleSchema(
                 id=_rid,
                 name=_r.get("name", _rid),
@@ -81,11 +95,12 @@ def list_rules(
                 severity=_r.get("severity", "P1"),
                 action=_r.get("action", "warn"),
                 pattern=None,
-                enabled=db_override.enabled if db_override else True,
+                enabled=db_override.enabled if db_override else (_rid not in disabled_ids),
                 is_custom=False,
                 source="sdk",
+                group=_rule_group(_rid),
             ))
-    except ImportError:
+    except Exception:
         pass
 
     # Add user custom rules
@@ -102,6 +117,7 @@ def list_rules(
                 enabled=r.enabled,
                 is_custom=True,
                 source="user",
+                group=_rule_group(r.id),
             ))
 
     # Apply filters
@@ -113,6 +129,11 @@ def list_rules(
         merged = [r for r in merged if r.severity == severity]
     if enabled_only is not None:
         merged = [r for r in merged if r.enabled == enabled_only]
+    if group:
+        merged = [r for r in merged if _rule_group(r.id) == group]
+
+    # Sort by ID for consistent ordering
+    merged.sort(key=lambda r: r.id)
 
     total = len(merged)
     offset = (page - 1) * page_size
@@ -143,18 +164,17 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
             enabled=db_override.enabled if db_override else sdk_rule.enabled,
             is_custom=False,
             source="sdk",
+            group=_rule_group(rule_id),
         )
     except (KeyError, RuleNotFoundError):
         pass
 
-    # Check scanner rules (SEC/IAC series) — via CodeReviewScanner
+    # Check scanner rules (SEC/IAC series) — via engine.get_code_review_rules()
     try:
-        from kasra.scanner import CodeReviewScanner
-        _s = CodeReviewScanner()
-        _s.load_rules()
-        for _r in _s.rules:
+        for _r in engine_service.engine.get_code_review_rules():
             if _r.get("id") == rule_id:
                 db_override = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
+                disabled_ids = engine_service.engine.disabled_code_review_rule_ids
                 return RuleSchema(
                     id=_r["id"],
                     name=_r.get("name", rule_id),
@@ -163,11 +183,12 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
                     severity=_r.get("severity", "P1"),
                     action=_r.get("action", "warn"),
                     pattern=None,
-                    enabled=db_override.enabled if db_override else True,
+                    enabled=db_override.enabled if db_override else (rule_id not in disabled_ids),
                     is_custom=False,
                     source="sdk",
+                    group=_rule_group(rule_id),
                 )
-    except ImportError:
+    except Exception:
         pass
 
     # Check DB custom rules
@@ -184,6 +205,7 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
             enabled=db_rule.enabled,
             is_custom=db_rule.is_custom,
             source="user",
+            group=_rule_group(rule_id),
         )
 
     return None
@@ -250,13 +272,12 @@ def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema |
         except (KeyError, RuleNotFoundError):
             pass
 
-        # Also check scanner rules (SEC series)
+        # Also check scanner rules (SEC series) via the engine's code review rule IDs
         if not is_valid:
             try:
-                from kasra.scanner.checkers import init_checkers
-                if rule_id in init_checkers():
+                if rule_id in engine_service.engine.get_code_review_rule_ids():
                     is_valid = True
-            except ImportError:
+            except Exception:
                 pass
 
         if not is_valid:
@@ -291,13 +312,28 @@ def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema |
     # ── Sync enabled state to live SDK engine ────────────────────────────
     # Without this, toggling a rule in the frontend writes to DB but the
     # in-memory SDK engine still uses the old value.
+    #
+    # Two categories of rules:
+    #   I/O rules (I-xx, O-xx)  → engine.enable_rule / disable_rule
+    #   Code review rules (SEC-xx, IAC-xx) → engine.enable_code_review_rule / disable_code_review_rule
     if update.enabled is not None:
+        engine = engine_service.engine
         try:
-            sdk_rule = engine_service.engine.get_rule(rule_id)
-            sdk_rule.enabled = db_rule.enabled
-            logger.debug("Synced SDK rule %s enabled=%s", rule_id, db_rule.enabled)
-        except (KeyError, RuleNotFoundError):
-            pass  # U-series custom rules don't exist in SDK
+            if db_rule.enabled:
+                engine.enable_rule(rule_id)
+            else:
+                engine.disable_rule(rule_id)
+            logger.debug("Synced I/O rule %s enabled=%s", rule_id, db_rule.enabled)
+        except RuleNotFoundError:
+            # Not an I/O rule — try code review rule methods
+            try:
+                if db_rule.enabled:
+                    engine.enable_code_review_rule(rule_id)
+                else:
+                    engine.disable_code_review_rule(rule_id)
+                logger.debug("Synced code review rule %s enabled=%s", rule_id, db_rule.enabled)
+            except ValueError:
+                pass  # Not a code review rule either (U-series custom rule)
 
     return RuleSchema(
         id=db_rule.id,

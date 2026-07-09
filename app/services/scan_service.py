@@ -226,13 +226,49 @@ def scan_output(
     return _to_scan_response(result, direction="output")
 
 
+def _log_code_review_findings(
+    db: DBSession,
+    *,
+    result: "kasra.scanner.models.CodeReviewResult",
+    user_id: str | None = None,
+    commit: bool = True,
+) -> None:
+    """Write code review findings to the audit_logs table."""
+    from datetime import datetime
+
+    now = datetime.utcnow()
+
+    for f in result.findings:
+        log_entry = AuditLog(
+            timestamp=now,
+            user_id=user_id,
+            rule_id=f.rule_id,
+            rule_name=f.rule_name,
+            severity=f.severity,
+            action="warn",
+            direction="batch",
+            matched_text=f.matched_text[:500] if f.matched_text else None,
+            file_path=f.file_path,
+            line_number=f.line_number,
+            match_count=1,
+            status="pending",
+            extra_metadata={"confidence": f.confidence, "message": f.message},
+        )
+        db.add(log_entry)
+
+    if commit:
+        db.commit()
+
+
 def scan_batch(
     path: str,
     db: DBSession,
     user_id: str | None = None,
 ) -> BatchScanResponse:
-    """Run batch directory scan and log results."""
+    """Run batch code review scan and log results."""
     import os
+    from collections import defaultdict
+
     full_path = os.path.abspath(path)
 
     if not os.path.exists(full_path):
@@ -240,59 +276,62 @@ def scan_batch(
 
     t0 = time.monotonic()
 
-    if os.path.isfile(full_path):
-        results = [engine_service.scan_file(full_path)]
-    else:
-        results = engine_service.scan_directory(full_path)
+    # review_code() handles both files and directories internally
+    result = engine_service.review_code(full_path)
 
     total_time = (time.monotonic() - t0) * 1000
 
+    # Group findings by file path
+    findings_by_file: dict[str, list] = defaultdict(list)
+    for finding in result.findings:
+        findings_by_file[finding.file_path].append(finding)
+
     file_results: list[BatchScanFileResult] = []
-    total_findings = 0
-    files_with_findings = 0
+    worst_severity_rank = {"P0": 0, "P1": 1, "P2": 2}
 
-    for r in results:
-        file_path = r.metadata.get("file_path", "unknown")
+    for file_path, findings in sorted(findings_by_file.items()):
         triggered = []
-        for dr in r.triggered_rules:
+        worst_rank = 99
+        for finding in findings:
             triggered.append(TriggeredRuleSchema(
-                rule_id=dr.rule_id,
-                rule_name=dr.rule_name,
-                severity=_sev(dr.severity),
-                action=_act(dr.action),
-                match_count=dr.match_count,
-                matched_text=dr.matches[0].matched_text[:200] if dr.matches and len(dr.matches) > 0 else None,
-                evidence=[{"source_layer": e.source_layer, "reason": e.reason} for e in dr.evidence] if dr.evidence else [],
+                rule_id=finding.rule_id,
+                rule_name=finding.rule_name,
+                severity=finding.severity,
+                action="warn",
+                match_count=1,
+                matched_text=finding.matched_text[:200] if finding.matched_text else None,
             ))
+            rank = worst_severity_rank.get(finding.severity, 99)
+            if rank < worst_rank:
+                worst_rank = rank
 
-        sev = "ok"
-        if triggered:
-            sev = _sev(r.overall_severity)
+        sev = {0: "P0", 1: "P1", 2: "P2"}.get(worst_rank, "ok")
 
         file_results.append(BatchScanFileResult(
             file_path=file_path,
             triggered_rules=triggered,
             severity=sev,
-            execution_time_ms=r.execution_time_ms,
+            execution_time_ms=0.0,  # per-file timing not available from CodeReviewResult
         ))
 
-        if triggered:
-            files_with_findings += 1
-            total_findings += len(triggered)
+    # Log all findings to audit_logs
+    _log_code_review_findings(
+        db, result=result, user_id=user_id, commit=True,
+    )
 
-        # Log each file's findings to audit_logs
-        _log_to_db(
-            db, result=r, direction="batch",
-            user_id=user_id, file_path=file_path,
-            commit=False,
-        )
-
-    db.commit()
+    # Update user behavior summary
+    all_rule_ids = [f.rule_id for f in result.findings]
+    _update_user_behavior(
+        db, user_id=user_id,
+        blocked=False,
+        warned=bool(result.findings),
+        rule_ids=all_rule_ids,
+    )
 
     return BatchScanResponse(
-        total_files=len(results),
-        files_with_findings=files_with_findings,
-        total_findings=total_findings,
+        total_files=result.files_scanned,
+        files_with_findings=len(findings_by_file),
+        total_findings=len(result.findings),
         results=file_results,
         execution_time_ms=round(total_time, 2),
     )

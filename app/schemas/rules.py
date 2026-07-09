@@ -20,6 +20,7 @@ class RuleSchema(BaseModel):
     enabled: bool = Field(default=True)
     is_custom: bool = Field(default=False)
     source: str | None = Field(default=None)
+    group: str | None = Field(default=None, description="Rule group: input / output / code_review")
 
     model_config = {"from_attributes": True}
 

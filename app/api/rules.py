@@ -18,6 +18,7 @@ def list_rules(
     severity: str | None = Query(default=None),
     enabled_only: bool | None = Query(default=None),
     custom_only: bool | None = Query(default=None),
+    group: str | None = Query(default=None, description="Filter by group: input, output, code_review"),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=100, ge=1, le=500),
     db: DBSession = Depends(get_db),
@@ -29,6 +30,7 @@ def list_rules(
         severity=severity,
         enabled_only=enabled_only,
         custom_only=custom_only,
+        group=group,
         page=page,
         page_size=page_size,
     )

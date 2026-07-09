@@ -8,11 +8,20 @@ const SEV_COLORS: Record<string, string> = {
   P2: 'bg-slate-100 text-slate-800',
 }
 
+type RuleGroup = 'input' | 'output' | 'code_review'
+
+const TABS: { key: RuleGroup; label: string; desc: string }[] = [
+  { key: 'input', label: 'Input', desc: 'I-series — user input detection' },
+  { key: 'output', label: 'Output', desc: 'O-series — AI output detection' },
+  { key: 'code_review', label: 'Code Review', desc: 'SEC / IAC — security audit' },
+]
+
 export default function Rules() {
   const [rules, setRules] = useState<RuleItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [severity, setSeverity] = useState('')
+  const [group, setGroup] = useState<RuleGroup>('input')
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -21,22 +30,20 @@ export default function Rules() {
   const fetchRules = () => {
     setLoading(true)
     setError(null)
-    getRules({ page, page_size: pageSize, severity: severity || undefined })
+    getRules({ page, page_size: pageSize, severity: severity || undefined, group })
       .then((data) => { setRules(data.items); setTotal(data.total) })
       .catch((e) => { setError(e.message) })
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchRules() }, [page, severity])
+  useEffect(() => { fetchRules() }, [page, severity, group])
 
   const handleToggle = async (ruleId: string, currentEnabled: boolean) => {
     setToggling(ruleId)
-    // Optimistic update
     setRules(rules.map(r => r.id === ruleId ? { ...r, enabled: !currentEnabled } : r))
     try {
       await updateRule(ruleId, { enabled: !currentEnabled })
     } catch (e) {
-      // Revert on failure
       setRules(rules.map(r => r.id === ruleId ? { ...r, enabled: currentEnabled } : r))
       setError(`Failed to update rule ${ruleId}`)
     }
@@ -49,6 +56,25 @@ export default function Rules() {
     <div>
       <h2 className="text-2xl font-bold mb-6">Rule Management</h2>
 
+      {/* Three tabs */}
+      <div className="flex gap-1 mb-5">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => { setGroup(t.key); setPage(1); setSeverity('') }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              group === t.key
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {t.label}
+            <span className="ml-1.5 text-xs opacity-70">{t.desc}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Filters */}
       <div className="flex gap-3 mb-4">
         <select
           value={severity}
@@ -60,7 +86,7 @@ export default function Rules() {
           <option value="P1">P1 - High</option>
           <option value="P2">P2 - Medium</option>
         </select>
-        <span className="text-sm text-slate-500 self-center">{total} total rules</span>
+        <span className="text-sm text-slate-500 self-center">{total} rules</span>
       </div>
 
       {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">Failed to load: {error}</div>}
@@ -69,7 +95,7 @@ export default function Rules() {
         {loading ? (
           <div className="p-8 text-center text-slate-500">Loading...</div>
         ) : rules.length === 0 ? (
-          <div className="p-8 text-center text-slate-400">No data</div>
+          <div className="p-8 text-center text-slate-400">No rules in this group</div>
         ) : (
           <table className="w-full text-sm">
             <thead>

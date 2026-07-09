@@ -96,6 +96,7 @@ export interface RuleItem {
   enabled: boolean;
   is_custom: boolean;
   category: string | null;
+  group: string | null;
 }
 
 export interface UserBehaviorPage {
@@ -143,7 +144,7 @@ export async function getDashboardTrend(period = '7d') {
   return request<DashboardTrend>(`/v1/dashboard/trend?period=${period}`);
 }
 
-export async function getRules(params: { page?: number; page_size?: number; severity?: string }) {
+export async function getRules(params: { page?: number; page_size?: number; severity?: string; group?: string }) {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, String(v)); });
   return request<RuleListResponse>(`/v1/rules?${qs}`);
