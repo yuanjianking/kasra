@@ -1,12 +1,11 @@
-"""Kasra MCP Server — Code Review + Detection tools.
+"""Kasra MCP Server — Code Review tools only.
 
 Exposes MCP tools for:
   - ``kasra_scan_file``     — file/directory code review (SEC/IAC rules)
-  - ``kasra_scan_input``    — input content detection (I-series rules)
-  - ``kasra_scan_output``   — output content detection (O-series rules)
   - ``kasra_get_rules``     — list loaded rules
-  - ``kasra_scan_prompt``   — combined input + output scan
   - ``health``              — engine health status
+
+Input/output detection is handled by hooks (kasra-hook.sh) at the harness level.
 """
 from __future__ import annotations
 
@@ -39,10 +38,10 @@ _mcp_port = int(os.environ.get("KASRA_MCP_PORT", "8090"))
 kasra_server = FastMCP(
     name="Kasra Code Reviewer",
     instructions=(
-        "Kasra security tools. Use kasra_scan_file for code review of "
-        "files and directories (SEC/IAC rules). Use kasra_scan_input / "
-        "kasra_scan_output for content detection (I/O rules). "
-        "Use kasra_get_rules to list all loaded rules."
+        "Kasra Code Review tool. Scans files and directories for security "
+        "vulnerabilities: SQL injection, XSS, hardcoded secrets, "
+        "Docker/K8s misconfigurations, and 160+ other code security rules. "
+        "Use kasra_scan_file to review code before committing."
     ),
     host=_mcp_host,
     port=_mcp_port,
@@ -80,47 +79,6 @@ def health() -> str:
         "rules_loaded": engine.rule_count,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, ensure_ascii=False)
-
-
-# ===========================================================================
-# Input detection
-# ===========================================================================
-
-
-def scan_input(content: str, user_id: str | None = None) -> str:
-    """Scan input content against I-series rules.
-
-    Args:
-        content: The text content to scan.
-        user_id: Optional user identifier.
-
-    Returns:
-        JSON string with scan results.
-    """
-    _ensure_engine()
-    kwargs = {}
-    if user_id is not None:
-        kwargs["user_id"] = user_id
-    result = engine_service.detect_input(content, **kwargs)
-    return json.dumps(_agg_result_to_dict(result, direction="input"), ensure_ascii=False)
-
-
-def scan_output(content: str, user_id: str | None = None) -> str:
-    """Scan output content against O-series rules.
-
-    Args:
-        content: The text content to scan.
-        user_id: Optional user identifier.
-
-    Returns:
-        JSON string with scan results.
-    """
-    _ensure_engine()
-    kwargs = {}
-    if user_id is not None:
-        kwargs["user_id"] = user_id
-    result = engine_service.detect_output(content, **kwargs)
-    return json.dumps(_agg_result_to_dict(result, direction="output"), ensure_ascii=False)
 
 
 # ===========================================================================
@@ -238,40 +196,6 @@ def get_rules(severity: str | None = None, enabled_only: bool | None = None) -> 
 
 
 # ===========================================================================
-# Combined input + output scan
-# ===========================================================================
-
-
-def scan_prompt(prompt: str, response: str | None = None, user_id: str | None = None) -> str:
-    """Scan both input prompt and optional AI response.
-
-    Args:
-        prompt: The user input prompt.
-        response: Optional AI response text.
-        user_id: Optional user identifier.
-
-    Returns:
-        JSON string with input and (if provided) output scan results.
-    """
-    _ensure_engine()
-
-    kwargs = {}
-    if user_id is not None:
-        kwargs["user_id"] = user_id
-
-    input_result = engine_service.detect_input(prompt, **kwargs)
-    output_result = None
-    if response is not None:
-        output_result = engine_service.detect_output(response, **kwargs)
-
-    result = {
-        "input": _agg_result_to_dict(input_result, direction="input"),
-        "output": _agg_result_to_dict(output_result, direction="output") if output_result else None,
-    }
-    return json.dumps(result, ensure_ascii=False)
-
-
-# ===========================================================================
 # MCP Tool registration
 # ===========================================================================
 
@@ -291,30 +215,6 @@ def mcp_scan_file(path: str) -> str:
 
 
 @kasra_server.tool(
-    name="kasra_scan_input",
-    description=(
-        "Scan user input content for security risks (credential leaks, "
-        "prompt injection, PII exposure, etc.). Runs I-series rules."
-    ),
-)
-def mcp_scan_input(content: str, user_id: str | None = None) -> str:
-    """MCP tool: scan input content."""
-    return scan_input(content, user_id=user_id)
-
-
-@kasra_server.tool(
-    name="kasra_scan_output",
-    description=(
-        "Scan AI-generated output for security risks (dangerous function "
-        "calls, shell commands, code execution, etc.). Runs O-series rules."
-    ),
-)
-def mcp_scan_output(content: str, user_id: str | None = None) -> str:
-    """MCP tool: scan output content."""
-    return scan_output(content, user_id=user_id)
-
-
-@kasra_server.tool(
     name="kasra_get_rules",
     description="List all loaded security rules with their severity, action, and status.",
 )
@@ -324,49 +224,12 @@ def mcp_get_rules(severity: str | None = None, enabled_only: bool | None = None)
 
 
 @kasra_server.tool(
-    name="kasra_scan_prompt",
-    description="Scan both input prompt and optional AI response in one call.",
-)
-def mcp_scan_prompt(prompt: str, response: str | None = None, user_id: str | None = None) -> str:
-    """MCP tool: scan prompt + optional response."""
-    return scan_prompt(prompt, response=response, user_id=user_id)
-
-
-@kasra_server.tool(
     name="health",
     description="Check the Kasra RuleEngine health status.",
 )
 def mcp_health() -> str:
     """MCP tool: return engine health."""
     return health()
-
-
-# ===========================================================================
-# Internal helpers
-# ===========================================================================
-
-
-def _agg_result_to_dict(result, direction: str) -> dict:
-    """Convert an AggregatedResult to a plain dict for JSON serialization."""
-    triggered = []
-    for dr in result.triggered_rules:
-        triggered.append({
-            "rule_id": dr.rule_id,
-            "rule_name": dr.rule_name,
-            "severity": _sev(dr.severity),
-            "action": _act(dr.action),
-            "match_count": dr.match_count,
-            "matched_text": dr.matches[0].matched_text[:200] if dr.matches else None,
-        })
-    return {
-        "direction": direction,
-        "blocked": result.blocked,
-        "action": _act(result.overall_action),
-        "severity": _sev(result.overall_severity),
-        "triggered_rules": triggered,
-        "warnings": result.warnings,
-        "execution_time_ms": result.execution_time_ms,
-    }
 
 
 # ===========================================================================

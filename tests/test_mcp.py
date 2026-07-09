@@ -10,11 +10,8 @@ import pytest
 
 from app.mcp_server import (
     health,
-    scan_input,
-    scan_output,
     scan_file,
     get_rules,
-    scan_prompt,
 )
 from app.services.engine_service import engine_service
 
@@ -47,70 +44,6 @@ class TestMcpHealth:
         # Engine should be healthy now
         assert data["status"] == "healthy"
         assert "timestamp" in data
-
-
-class TestMcpScanInput:
-    """MCP scan_input tool tests."""
-
-    def test_scan_input_safe_content(self):
-        """Safe content should not be blocked."""
-        result = scan_input(content="What is the weather today?")
-        data = json.loads(result)
-        assert "blocked" in data
-        assert "direction" in data
-        assert data["direction"] == "input"
-
-    def test_scan_input_detects_credentials(self):
-        """Credentials should be detected by input scan."""
-        result = scan_input(content="my password is secret123!")
-        data = json.loads(result)
-        assert "triggered_rules" in data
-        assert "blocked" in data
-
-    def test_scan_input_with_user_id(self):
-        """User ID parameter should be accepted."""
-        result = scan_input(content="hello", user_id="test-user")
-        data = json.loads(result)
-        assert data["direction"] == "input"
-
-    def test_scan_input_response_format(self):
-        """Input scan response should have all required fields."""
-        result = scan_input(content="test content")
-        data = json.loads(result)
-        assert "direction" in data
-        assert "blocked" in data
-        assert "action" in data
-        assert "severity" in data
-        assert "triggered_rules" in data
-        assert "execution_time_ms" in data
-
-
-class TestMcpScanOutput:
-    """MCP scan_output tool tests."""
-
-    def test_scan_output_safe_content(self):
-        """Safe output should not be blocked."""
-        result = scan_output(content="The answer is 42.")
-        data = json.loads(result)
-        assert "direction" in data
-        assert data["direction"] == "output"
-
-    def test_scan_output_detects_dangerous_code(self):
-        """Dangerous function calls should be detected."""
-        result = scan_output(content='Use eval(user_input) carefully.')
-        data = json.loads(result)
-        assert "triggered_rules" in data
-
-    def test_scan_output_response_format(self):
-        """Output scan response should have all required fields."""
-        result = scan_output(content="test output")
-        data = json.loads(result)
-        assert "direction" in data
-        assert "blocked" in data
-        assert "action" in data
-        assert "triggered_rules" in data
-        assert "execution_time_ms" in data
-        assert "warnings" in data
 
 
 class TestMcpScanFile:
@@ -220,28 +153,3 @@ class TestMcpGetRules:
             assert "category" in rule
 
 
-class TestMcpScanPrompt:
-    """MCP scan_prompt (combined input+output) tool tests."""
-
-    def test_scan_prompt_input_only(self):
-        """Scan prompt without response should scan only input."""
-        result = scan_prompt(prompt="hello world")
-        data = json.loads(result)
-        assert "input" in data
-        assert data["output"] is None
-
-    def test_scan_prompt_with_response(self):
-        """Scan prompt with response should scan both."""
-        result = scan_prompt(
-            prompt="hello",
-            response="The answer is 42.",
-        )
-        data = json.loads(result)
-        assert "input" in data
-        assert "output" in data
-
-    def test_scan_prompt_with_user_id(self):
-        """scan_prompt should accept user_id."""
-        result = scan_prompt(prompt="test", user_id="dev-1")
-        data = json.loads(result)
-        assert "input" in data
