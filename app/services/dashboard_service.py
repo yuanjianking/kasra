@@ -163,10 +163,13 @@ def get_user_behavior(
                 blocked_requests=item.blocked_requests,
                 warned_requests=item.warned_requests,
                 anomaly_score=item.anomaly_score,
-                top_triggers=sorted(
-                    (item.rule_triggers or {}).items(),
-                    key=lambda x: -x[1],
-                )[:5] if item.rule_triggers else [],
+                top_triggers=[
+                    {"rule_id": k, "count": v}
+                    for k, v in sorted(
+                        (item.rule_triggers or {}).items(),
+                        key=lambda x: -x[1],
+                    )
+                ][:5] if item.rule_triggers else [],
             )
             for item in items
         ],

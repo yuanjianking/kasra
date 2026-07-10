@@ -71,7 +71,7 @@ export default function Login() {
         </form>
 
         <p className="text-xs text-slate-400 text-center mt-6">
-          Default key: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">dev-api-key-change-in-production</code>
+          Default key: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-xs">kasra-dev-api-key-change-in-prod</code>
         </p>
       </div>
     </div>

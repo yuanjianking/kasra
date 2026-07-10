@@ -3,11 +3,15 @@ import { Routes, Route, NavLink } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import Login from './pages/Login'
 import ErrorBoundary from './ErrorBoundary'
+import { ToastProvider } from './components'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const AuditLogs = lazy(() => import('./pages/AuditLogs'))
 const Rules = lazy(() => import('./pages/Rules'))
 const UserBehavior = lazy(() => import('./pages/UserBehavior'))
+const ScanConsole = lazy(() => import('./pages/ScanConsole'))
+const ComplianceReport = lazy(() => import('./pages/ComplianceReport'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 function LoadingSkeleton() {
   return (
@@ -25,17 +29,22 @@ function LoadingSkeleton() {
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '📊' },
+  { path: '/scan', label: 'Scan Console', icon: '🔬' },
   { path: '/audit-logs', label: 'Audit Logs', icon: '📋' },
   { path: '/rules', label: 'Rules', icon: '🛡️' },
-  { path: '/user-behavior', label: 'User Behavior', icon: '👤' },
+  { path: '/reports', label: 'Reports', icon: '📈' },
+  { path: '/user-behavior', label: 'Users', icon: '👤' },
+  { path: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ToastProvider>
     </ErrorBoundary>
   )
 }
@@ -114,9 +123,12 @@ function AppContent() {
           <Suspense fallback={<LoadingSkeleton />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/scan" element={<ScanConsole />} />
               <Route path="/audit-logs" element={<AuditLogs />} />
               <Route path="/rules" element={<Rules />} />
+              <Route path="/reports" element={<ComplianceReport />} />
               <Route path="/user-behavior" element={<UserBehavior />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </Suspense>
         </div>

@@ -23,6 +23,7 @@ from app.services.engine_service import engine_service
 from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.audit_chain import AuditChain  # noqa: F401
 from app.models.rule_config import RuleConfig  # noqa: F401
+from app.models.custom_rule import CustomRule  # noqa: F401
 from app.models.user import User  # noqa: F401
 from app.models.user_behavior import UserBehavior  # noqa: F401
 

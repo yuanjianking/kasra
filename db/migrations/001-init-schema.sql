@@ -48,6 +48,31 @@ CREATE TABLE IF NOT EXISTS rules (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── custom_rules ──
+CREATE TABLE IF NOT EXISTS custom_rules (
+    id              VARCHAR(32) PRIMARY KEY,          -- U-01, U-02, ...
+    name            VARCHAR(256) NOT NULL,
+    description     TEXT,
+    category        VARCHAR(64),                       -- custom, credential_leak, pii, ...
+    severity        VARCHAR(4) NOT NULL DEFAULT 'P2',  -- P0 / P1 / P2
+    action          VARCHAR(16) NOT NULL DEFAULT 'warn', -- block / warn / redact / clean
+
+    -- Detection method
+    pattern_type    VARCHAR(32) NOT NULL DEFAULT 'regex',   -- regex / keyword
+    pattern_value   TEXT NOT NULL DEFAULT '',               -- the regex or keyword text
+    pattern_confidence VARCHAR(10) DEFAULT '0.8',
+
+    -- Rule classification
+    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,  -- ["input"], ["output"], ["batch"]
+    target_files    JSONB,                                   -- ["**/*.py"] for code review
+
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_rules_enabled ON custom_rules (enabled);
+
 -- ── user_behavior ──
 CREATE TABLE IF NOT EXISTS user_behavior (
     user_id         VARCHAR(128) NOT NULL,

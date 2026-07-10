@@ -177,9 +177,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     #     so that rules disabled via the frontend persist across restarts.
     try:
         from app.database import SessionLocal
-        from app.services.rules_service import sync_disabled_rules_from_db
+        from app.services.rules_service import sync_disabled_rules_from_db, sync_custom_rules_from_db
         sync_db = SessionLocal()
         sync_disabled_rules_from_db(sync_db)
+        sync_custom_rules_from_db(sync_db)
         sync_db.close()
     except Exception:
         logger.exception("Failed to sync disabled rules from DB")

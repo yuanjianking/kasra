@@ -1,15 +1,22 @@
-"""Rules service — manage rules (SDK built-in + custom user rules)."""
+"""Rules service — manage SDK built-in rules + custom user rules.
+
+Two separate storage backends:
+  1. ``rules`` table (``RuleConfig``) — enabled/disabled override state for SDK rules
+  2. ``custom_rules`` table (``CustomRule``) — user-defined rules with full detection config
+"""
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
 from sqlalchemy.orm import Session as DBSession
 
 from kasra.exceptions import RuleNotFoundError
+from kasra.models.enums import ActionType, MatchMode, PatternType, Severity
+from kasra.models.rule import DetectionConfig, PatternDefinition, RuleDefinition
 
+from app.models.custom_rule import CustomRule
 from app.models.rule_config import RuleConfig
 from app.schemas.rules import RuleCreate, RuleSchema, RuleUpdate
 from app.services.engine_service import engine_service
@@ -17,70 +24,198 @@ from app.services.engine_service import engine_service
 logger = logging.getLogger("kasra.service.rules")
 
 
-def sync_disabled_rules_from_db(db: DBSession) -> None:
-    """Sync disabled rule states from the database to the in-memory engine.
-
-    Called once at startup after ``engine_service.initialize()`` so that
-    rules previously disabled via the frontend remain disabled across restarts.
-
-    Handles both I/O rules (I-xx, O-xx → ``engine.disable_rule()``) and
-    code review rules (SEC-xx, IAC-xx → ``engine.disable_code_review_rule()``).
-    """
-    engine = engine_service.engine
-
-    # Query all DB override records where the user explicitly disabled a rule
-    disabled_records = db.query(RuleConfig).filter(
-        RuleConfig.enabled == False,  # noqa: E712
-        RuleConfig.is_custom == False,
-    ).all()
-
-    if not disabled_records:
-        return
-
-    # Pre-warm the code review scanner so its disabled_rule_ids set exists
-    try:
-        engine.get_code_review_rules()
-    except Exception:
-        pass
-
-    io_count = 0
-    cr_count = 0
-
-    for record in disabled_records:
-        rule_id = record.id
-        group = _rule_group(rule_id)
-
-        try:
-            if group == "code_review":
-                engine.disable_code_review_rule(rule_id)
-                cr_count += 1
-            else:
-                engine.disable_rule(rule_id)
-                io_count += 1
-        except (RuleNotFoundError, ValueError):
-            # Rule may have been removed from the SDK — skip silently
-            pass
-
-    if cr_count or io_count:
-        logger.info(
-            "Synced disabled state from DB: %d I/O rules, %d code review rules",
-            io_count, cr_count,
-        )
-
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _rule_group(rule_id: str) -> str:
-    """Determine the display group of a rule from its ID.
-
-    Returns ``"input"``, ``"output"``, or ``"code_review"``.
-    """
+    """Determine the display group of an SDK rule from its ID."""
     prefix = rule_id.split("-", 1)[0] if "-" in rule_id else rule_id
     if prefix == "I":
         return "input"
     if prefix == "O":
         return "output"
-    # SEC, IAC, ARCH — all code review rules
     return "code_review"
 
+
+def _stages_to_group(stages: list[str]) -> str:
+    """Derive UI group from applicable_stages."""
+    if "batch" in stages:
+        return "code_review"
+    if "output" in stages:
+        return "output"
+    return "input"
+
+
+def _build_rule_definition(cr: CustomRule) -> RuleDefinition | None:
+    """Build a ``RuleDefinition`` from a ``CustomRule`` DB record."""
+    if not cr.pattern_value:
+        return None
+
+    return RuleDefinition(
+        id=cr.id,
+        name=cr.name,
+        description=cr.description or f"Custom rule: {cr.name}",
+        category=cr.category or "custom",
+        severity=Severity(cr.severity),
+        action=ActionType(cr.action),
+        applicable_stages=list(cr.applicable_stages or ["input"]),
+        detection=DetectionConfig(
+            mode=MatchMode.ANY,
+            patterns=[
+                PatternDefinition(
+                    type=PatternType(cr.pattern_type),
+                    value=cr.pattern_value,
+                    confidence=float(cr.pattern_confidence or "0.8"),
+                )
+            ],
+        ),
+        enabled=cr.enabled,
+    )
+
+
+def _build_cr_rule_dict(cr: CustomRule) -> dict[str, Any]:
+    """Build a code-review rule dict from a ``CustomRule`` DB record."""
+    return {
+        "id": cr.id,
+        "name": cr.name,
+        "description": cr.description or f"Custom rule: {cr.name}",
+        "category": cr.category or "custom",
+        "severity": cr.severity,
+        "action": cr.action,
+        "target_files": cr.target_files or ["**/*"],
+        "fp_risk": "medium",
+        "performance": "high",
+        "priority": 3,
+        "detection_method": cr.pattern_type,
+        "detection": {
+            "patterns": [
+                {
+                    "type": cr.pattern_type,
+                    "value": cr.pattern_value,
+                    "confidence": float(cr.pattern_confidence or "0.8"),
+                }
+            ]
+        },
+    }
+
+
+def _is_cr_custom_rule(cr: CustomRule) -> bool:
+    """Check if a custom rule targets code review (batch stage)."""
+    return "batch" in (cr.applicable_stages or [])
+
+
+def _sync_to_engine(cr: CustomRule) -> None:
+    """Inject a custom rule into the live RuleEngine."""
+    engine = engine_service.engine
+
+    if _is_cr_custom_rule(cr):
+        engine.add_custom_cr_rule(_build_cr_rule_dict(cr))
+        if not cr.enabled:
+            engine.disable_code_review_rule(cr.id)
+        logger.debug("Synced custom CR rule %s to scanner", cr.id)
+    else:
+        rule_def = _build_rule_definition(cr)
+        if rule_def is not None:
+            engine.add_custom_rule(rule_def)
+            if not cr.enabled:
+                engine.disable_rule(cr.id)
+            logger.debug("Synced custom I/O rule %s to store", cr.id)
+
+
+def _remove_from_engine(rule_id: str) -> None:
+    """Remove a custom rule from the live RuleEngine."""
+    engine = engine_service.engine
+    if engine.remove_custom_rule(rule_id):
+        return
+    engine.remove_custom_cr_rule(rule_id)
+
+
+def _schema_from_custom(cr: CustomRule) -> RuleSchema:
+    """Convert a ``CustomRule`` DB record to a ``RuleSchema``."""
+    return RuleSchema(
+        id=cr.id,
+        name=cr.name,
+        description=cr.description,
+        category=cr.category,
+        severity=cr.severity,
+        action=cr.action,
+        pattern=None,
+        pattern_type=cr.pattern_type,
+        pattern_value=cr.pattern_value,
+        applicable_stages=list(cr.applicable_stages or ["input"]),
+        target_files=cr.target_files,
+        enabled=cr.enabled,
+        is_custom=True,
+        source="user",
+        group=_stages_to_group(cr.applicable_stages or ["input"]),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Startup sync
+# ---------------------------------------------------------------------------
+
+def sync_disabled_rules_from_db(db: DBSession) -> None:
+    """Sync disabled SDK rule states from DB to the engine on startup."""
+    engine = engine_service.engine
+    disabled = db.query(RuleConfig).filter(
+        RuleConfig.enabled == False,  # noqa: E712
+        RuleConfig.is_custom == False,
+    ).all()
+    if not disabled:
+        return
+
+    try:
+        engine.get_code_review_rules()
+    except Exception:
+        pass
+
+    io_count = cr_count = 0
+    for rec in disabled:
+        grp = _rule_group(rec.id)
+        try:
+            if grp == "code_review":
+                engine.disable_code_review_rule(rec.id)
+                cr_count += 1
+            else:
+                engine.disable_rule(rec.id)
+                io_count += 1
+        except (RuleNotFoundError, ValueError):
+            pass
+
+    if cr_count or io_count:
+        logger.info(
+            "Synced disabled state from DB: %d I/O rules, %d CR rules",
+            io_count, cr_count,
+        )
+
+
+def sync_custom_rules_from_db(db: DBSession) -> int:
+    """Load all enabled custom rules from DB into the engine at startup."""
+    engine = engine_service.engine
+    try:
+        engine.get_code_review_rules()
+    except Exception:
+        pass
+
+    rules = db.query(CustomRule).filter(CustomRule.enabled == True).all()  # noqa: E712
+    count = 0
+    for cr in rules:
+        try:
+            _sync_to_engine(cr)
+            count += 1
+        except Exception as exc:
+            logger.warning("Failed to load custom rule %s: %s", cr.id, exc)
+
+    if count:
+        logger.info("Loaded %d custom rules from DB into engine", count)
+    return count
+
+
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
 
 def list_rules(
     db: DBSession,
@@ -93,27 +228,17 @@ def list_rules(
     page: int = 1,
     page_size: int = 100,
 ) -> dict[str, Any]:
-    """List rules from both SDK and custom DB records.
+    """List rules from three sources: SDK I/O rules + SDK CR rules + custom rules."""
+    engine = engine_service.engine
 
-    Combines SDK built-in rules with user-created custom rules.
-    """
-    # 1. Load SDK rules (from engine)
-    sdk_rules = engine_service.engine.get_rules()
+    # 1. SDK I/O rules
+    sdk_rules = engine.get_rules()
+    db_overrides = {r.id: r for r in db.query(RuleConfig).all()}
 
-    # 2. Load DB custom rules + overrides
-    # NOTE: category/severity/enabled filters are applied in-memory below
-    # to ensure SDK rules are also filtered consistently.
-    db_query = db.query(RuleConfig)
-    if custom_only:
-        db_query = db_query.filter(RuleConfig.is_custom == True)
-
-    db_rules = {r.id: r for r in db_query.all()}
-
-    # 3. Merge: SDK I/O rules + scanner rules + custom rules
     merged: list[RuleSchema] = []
 
     for rule in sdk_rules:
-        db_override = db_rules.get(rule.id)
+        override = db_overrides.get(rule.id)
         merged.append(RuleSchema(
             id=rule.id,
             name=rule.name,
@@ -121,23 +246,20 @@ def list_rules(
             category=rule.category,
             severity=str(rule.severity.value) if hasattr(rule.severity, "value") else str(rule.severity),
             action=str(rule.action.value) if hasattr(rule.action, "value") else str(rule.action),
-            pattern=None,
-            enabled=db_override.enabled if db_override else rule.enabled,
+            enabled=override.enabled if override else rule.enabled,
             is_custom=False,
             source="sdk",
             group=_rule_group(rule.id),
         ))
 
-    # 3b. Add scanner rules (SEC and IAC series) — loaded from the SDK's
-    #     get_code_review_rules() which reads _code-review-rules.json.
-    #     These rules run during review_code().
+    # 2. SDK CR rules (from engine scanner)
     try:
-        for _r in engine_service.engine.get_code_review_rules():
+        disabled_ids = engine.disabled_code_review_rule_ids
+        for _r in engine.get_code_review_rules():
             _rid = _r.get("id", "")
             if not _rid:
                 continue
-            db_override = db_rules.get(_rid)
-            disabled_ids = engine_service.engine.disabled_code_review_rule_ids
+            override = db_overrides.get(_rid)
             merged.append(RuleSchema(
                 id=_rid,
                 name=_r.get("name", _rid),
@@ -145,53 +267,36 @@ def list_rules(
                 category=_r.get("category", "code_security"),
                 severity=_r.get("severity", "P1"),
                 action=_r.get("action", "warn"),
-                pattern=None,
-                enabled=db_override.enabled if db_override else (_rid not in disabled_ids),
+                enabled=override.enabled if override else (_rid not in disabled_ids),
                 is_custom=False,
                 source="sdk",
-                group=_rule_group(_rid),
+                group="code_review",
             ))
     except Exception:
         pass
 
-    # Add user custom rules
-    for rid, r in db_rules.items():
-        if r.is_custom:
-            merged.append(RuleSchema(
-                id=r.id,
-                name=r.name,
-                description=r.description,
-                category=r.category,
-                severity=r.severity,
-                action=r.action,
-                pattern=r.pattern,
-                enabled=r.enabled,
-                is_custom=True,
-                source="user",
-                group=_rule_group(r.id),
-            ))
+    # 3. Custom rules (from custom_rules table)
+    for cr in db.query(CustomRule).all():
+        merged.append(_schema_from_custom(cr))
 
-    # Apply filters
+    # Filters
     if category:
         merged = [r for r in merged if r.category == category]
-    if custom_only:
-        merged = [r for r in merged if r.is_custom]
     if severity:
         merged = [r for r in merged if r.severity == severity]
     if enabled_only is not None:
         merged = [r for r in merged if r.enabled == enabled_only]
     if group:
-        merged = [r for r in merged if _rule_group(r.id) == group]
+        merged = [r for r in merged if r.group == group]
+    if custom_only:
+        merged = [r for r in merged if r.is_custom]
 
-    # Sort by ID for consistent ordering
     merged.sort(key=lambda r: r.id)
 
     total = len(merged)
     offset = (page - 1) * page_size
-    page_items = merged[offset:offset + page_size]
-
     return {
-        "items": page_items,
+        "items": merged[offset:offset + page_size],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -199,20 +304,21 @@ def list_rules(
 
 
 def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
-    """Get a single rule by ID (checks SDK rules + DB custom rules)."""
-    # Check SDK rules
+    """Get a single rule by ID from SDK or custom rules."""
+    engine = engine_service.engine
+
+    # SDK I/O rules
     try:
-        sdk_rule = engine_service.engine.get_rule(rule_id)
-        db_override = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
+        sdk_rule = engine.get_rule(rule_id)
+        override = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
         return RuleSchema(
             id=sdk_rule.id,
             name=sdk_rule.name,
             description=sdk_rule.description,
             category=sdk_rule.category,
-            severity=sdk_rule.severity.value if hasattr(sdk_rule.severity, "value") else str(sdk_rule.severity),
-            action=sdk_rule.action.value if hasattr(sdk_rule.action, "value") else str(sdk_rule.action),
-            pattern=None,
-            enabled=db_override.enabled if db_override else sdk_rule.enabled,
+            severity=str(sdk_rule.severity.value) if hasattr(sdk_rule.severity, "value") else str(sdk_rule.severity),
+            action=str(sdk_rule.action.value) if hasattr(sdk_rule.action, "value") else str(sdk_rule.action),
+            enabled=override.enabled if override else sdk_rule.enabled,
             is_custom=False,
             source="sdk",
             group=_rule_group(rule_id),
@@ -220,12 +326,12 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
     except (KeyError, RuleNotFoundError):
         pass
 
-    # Check scanner rules (SEC/IAC series) — via engine.get_code_review_rules()
+    # SDK CR rules
     try:
-        for _r in engine_service.engine.get_code_review_rules():
+        disabled_ids = engine.disabled_code_review_rule_ids
+        for _r in engine.get_code_review_rules():
             if _r.get("id") == rule_id:
-                db_override = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
-                disabled_ids = engine_service.engine.disabled_code_review_rule_ids
+                override = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
                 return RuleSchema(
                     id=_r["id"],
                     name=_r.get("name", rule_id),
@@ -233,179 +339,167 @@ def get_rule(db: DBSession, rule_id: str) -> RuleSchema | None:
                     category=_r.get("category", "code_security"),
                     severity=_r.get("severity", "P1"),
                     action=_r.get("action", "warn"),
-                    pattern=None,
-                    enabled=db_override.enabled if db_override else (rule_id not in disabled_ids),
+                    enabled=override.enabled if override else (rule_id not in disabled_ids),
                     is_custom=False,
                     source="sdk",
-                    group=_rule_group(rule_id),
+                    group="code_review",
                 )
     except Exception:
         pass
 
-    # Check DB custom rules
-    db_rule = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
-    if db_rule:
-        return RuleSchema(
-            id=db_rule.id,
-            name=db_rule.name,
-            description=db_rule.description,
-            category=db_rule.category,
-            severity=db_rule.severity,
-            action=db_rule.action,
-            pattern=db_rule.pattern,
-            enabled=db_rule.enabled,
-            is_custom=db_rule.is_custom,
-            source="user",
-            group=_rule_group(rule_id),
-        )
+    # Custom rules
+    cr = db.query(CustomRule).filter(CustomRule.id == rule_id).first()
+    if cr:
+        return _schema_from_custom(cr)
 
     return None
 
 
 def create_rule(db: DBSession, rule: RuleCreate) -> RuleSchema:
-    """Create a new custom rule (U-series)."""
+    """Create a new custom rule and sync to live engine."""
     if not rule.id.startswith("U-"):
         raise ValueError("Custom rule IDs must start with U-")
 
-    existing = db.query(RuleConfig).filter(RuleConfig.id == rule.id).first()
-    if existing:
+    if db.query(CustomRule).filter(CustomRule.id == rule.id).first():
         raise ValueError(f"Rule {rule.id} already exists")
 
-    db_rule = RuleConfig(
+    conf_str = str(rule.pattern_confidence) if rule.pattern_confidence is not None else "0.8"
+
+    cr = CustomRule(
         id=rule.id,
         name=rule.name,
         description=rule.description,
         category=rule.category,
         severity=rule.severity,
         action=rule.action,
-        pattern=rule.pattern,
+        pattern_type=rule.pattern_type,
+        pattern_value=rule.pattern_value,
+        pattern_confidence=conf_str,
+        applicable_stages=rule.applicable_stages,
+        target_files=rule.target_files,
         enabled=rule.enabled,
-        is_custom=True,
-        source="user",
-        metadata={"created_via": "api"},
     )
-    db.add(db_rule)
+    db.add(cr)
     db.commit()
-    db.refresh(db_rule)
+    db.refresh(cr)
 
-    return RuleSchema(
-        id=db_rule.id,
-        name=db_rule.name,
-        description=db_rule.description,
-        category=db_rule.category,
-        severity=db_rule.severity,
-        action=db_rule.action,
-        pattern=db_rule.pattern,
-        enabled=db_rule.enabled,
-        is_custom=True,
-        source="user",
-    )
+    try:
+        _sync_to_engine(cr)
+        logger.info("Custom rule %s synced to engine", rule.id)
+    except Exception as exc:
+        logger.warning("Rule %s created but engine sync failed: %s", rule.id, exc)
+
+    return _schema_from_custom(cr)
 
 
 def update_rule(db: DBSession, rule_id: str, update: RuleUpdate) -> RuleSchema | None:
-    """Update rule override (for SDK rules) or custom rule (for U-series).
+    """Update a rule — custom rule fields or SDK rule enabled/disabled."""
+    # Check custom rule table first
+    cr = db.query(CustomRule).filter(CustomRule.id == rule_id).first()
+    if cr:
+        if update.name is not None:
+            cr.name = update.name
+        if update.description is not None:
+            cr.description = update.description
+        if update.severity is not None:
+            cr.severity = update.severity
+        if update.action is not None:
+            cr.action = update.action
+        if update.pattern_type is not None:
+            cr.pattern_type = update.pattern_type
+        if update.pattern_value is not None:
+            cr.pattern_value = update.pattern_value
+        if update.pattern_confidence is not None:
+            cr.pattern_confidence = update.pattern_confidence
+        if update.applicable_stages is not None:
+            cr.applicable_stages = update.applicable_stages
+        if update.target_files is not None:
+            cr.target_files = update.target_files
+        if update.enabled is not None:
+            cr.enabled = update.enabled
 
-    When toggling ``enabled`` on an SDK rule, the change is pushed to the
-    live RuleEngine in-memory immediately — no restart needed.
-    """
-    db_rule = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
+        db.commit()
+        db.refresh(cr)
 
-    if db_rule is None:
-        # Create an override record for SDK rules
+        try:
+            _remove_from_engine(rule_id)
+            _sync_to_engine(cr)
+            logger.debug("Re-synced custom rule %s after update", rule_id)
+        except Exception as exc:
+            logger.warning("Engine re-sync failed for %s: %s", rule_id, exc)
+
+        return _schema_from_custom(cr)
+
+    # SDK rule — create or update override in RuleConfig
+    sdk_rule = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
+
+    if sdk_rule is None:
         if rule_id.startswith("U-"):
             return None  # U-series must be created first
 
-        # Check if it's a valid SDK rule
+        # Validate it's a real SDK rule
         is_valid = False
         try:
             engine_service.engine.get_rule(rule_id)
             is_valid = True
         except (KeyError, RuleNotFoundError):
             pass
-
-        # Also check scanner rules (SEC series) via the engine's code review rule IDs
         if not is_valid:
             try:
                 if rule_id in engine_service.engine.get_code_review_rule_ids():
                     is_valid = True
             except Exception:
                 pass
-
         if not is_valid:
             return None
 
-        db_rule = RuleConfig(
-            id=rule_id,
-            name=update.name or rule_id,
-            enabled=True,
-            is_custom=False,
-            source="sdk",
-        )
-        db.add(db_rule)
+        sdk_rule = RuleConfig(id=rule_id, name=rule_id, enabled=True, is_custom=False, source="sdk")
+        db.add(sdk_rule)
 
-    # Apply updates
-    if update.name is not None:
-        db_rule.name = update.name
-    if update.description is not None:
-        db_rule.description = update.description
-    if update.severity is not None:
-        db_rule.severity = update.severity
-    if update.action is not None:
-        db_rule.action = update.action
-    if update.pattern is not None:
-        db_rule.pattern = update.pattern
     if update.enabled is not None:
-        db_rule.enabled = update.enabled
-
+        sdk_rule.enabled = update.enabled
     db.commit()
-    db.refresh(db_rule)
+    db.refresh(sdk_rule)
 
-    # ── Sync enabled state to live SDK engine ────────────────────────────
-    # Without this, toggling a rule in the frontend writes to DB but the
-    # in-memory SDK engine still uses the old value.
-    #
-    # Two categories of rules:
-    #   I/O rules (I-xx, O-xx)  → engine.enable_rule / disable_rule
-    #   Code review rules (SEC-xx, IAC-xx) → engine.enable_code_review_rule / disable_code_review_rule
+    # Sync to engine
     if update.enabled is not None:
         engine = engine_service.engine
         try:
-            if db_rule.enabled:
+            if sdk_rule.enabled:
                 engine.enable_rule(rule_id)
             else:
                 engine.disable_rule(rule_id)
-            logger.debug("Synced I/O rule %s enabled=%s", rule_id, db_rule.enabled)
         except RuleNotFoundError:
-            # Not an I/O rule — try code review rule methods
             try:
-                if db_rule.enabled:
+                if sdk_rule.enabled:
                     engine.enable_code_review_rule(rule_id)
                 else:
                     engine.disable_code_review_rule(rule_id)
-                logger.debug("Synced code review rule %s enabled=%s", rule_id, db_rule.enabled)
             except ValueError:
-                pass  # Not a code review rule either (U-series custom rule)
+                pass
 
-    return RuleSchema(
-        id=db_rule.id,
-        name=db_rule.name,
-        description=db_rule.description,
-        category=db_rule.category,
-        severity=db_rule.severity,
-        action=db_rule.action,
-        pattern=db_rule.pattern,
-        enabled=db_rule.enabled,
-        is_custom=db_rule.is_custom,
-        source=db_rule.source,
-    )
+    return get_rule(db, rule_id)
 
 
 def delete_rule(db: DBSession, rule_id: str) -> bool:
-    """Delete a custom rule or reset an SDK rule override."""
-    db_rule = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
-    if db_rule is None:
-        return False
+    """Delete a custom rule (or reset an SDK rule override)."""
+    # Check custom rules first
+    cr = db.query(CustomRule).filter(CustomRule.id == rule_id).first()
+    if cr:
+        db.delete(cr)
+        db.commit()
+        try:
+            _remove_from_engine(rule_id)
+            logger.info("Custom rule %s removed from engine", rule_id)
+        except Exception as exc:
+            logger.warning("Engine remove failed for %s: %s", rule_id, exc)
+        return True
 
-    db.delete(db_rule)
-    db.commit()
-    return True
+    # SDK rule — delete the override record
+    sdk_rule = db.query(RuleConfig).filter(RuleConfig.id == rule_id).first()
+    if sdk_rule:
+        db.delete(sdk_rule)
+        db.commit()
+        return True
+
+    return False

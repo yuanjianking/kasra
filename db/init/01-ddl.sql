@@ -56,7 +56,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_rule_date     ON audit_logs (rule_id, 
 
 
 -- ── Rule configuration table ─────────────────────────────────────────────────
--- SDK built-in rule snapshots + user custom rules (U-series)
+-- SDK built-in rule enabled/disabled override state (custom rules go in custom_rules table)
 CREATE TABLE IF NOT EXISTS rules (
     id              VARCHAR(32) PRIMARY KEY,          -- I-01, SEC-06, U-01
     name            VARCHAR(256) NOT NULL,
@@ -77,6 +77,37 @@ CREATE INDEX IF NOT EXISTS idx_rules_severity   ON rules (severity);
 CREATE INDEX IF NOT EXISTS idx_rules_category   ON rules (category);
 CREATE INDEX IF NOT EXISTS idx_rules_enabled    ON rules (enabled);
 CREATE INDEX IF NOT EXISTS idx_rules_custom     ON rules (is_custom) WHERE is_custom = TRUE;
+
+-- ── Custom rules table ───────────────────────────────────────────────────────
+-- User-defined detection rules with full detection config
+CREATE TABLE IF NOT EXISTS custom_rules (
+    id              VARCHAR(32) PRIMARY KEY,          -- U-01, U-02, ...
+    name            VARCHAR(256) NOT NULL,
+    description     TEXT,
+    category        VARCHAR(64),                       -- custom, credential_leak, pii, ...
+    severity        VARCHAR(4) NOT NULL DEFAULT 'P2',  -- P0 / P1 / P2
+    action          VARCHAR(16) NOT NULL DEFAULT 'warn', -- block / warn / redact / clean
+
+    -- Detection method
+    pattern_type    VARCHAR(32) NOT NULL DEFAULT 'regex',   -- regex / keyword
+    pattern_value   TEXT NOT NULL DEFAULT '',               -- the regex or keyword text
+    pattern_confidence VARCHAR(10) DEFAULT '0.8',
+
+    -- Rule classification
+    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,  -- ["input"], ["output"], ["batch"]
+    target_files    JSONB,                                   -- ["**/*.py"] for code review
+
+    enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_rules_enabled ON custom_rules (enabled);
+
+COMMENT ON TABLE  custom_rules IS 'Custom rules — user-defined detection rules';
+COMMENT ON COLUMN custom_rules.pattern_type IS 'Detection pattern type: regex / keyword';
+COMMENT ON COLUMN custom_rules.applicable_stages IS 'Pipeline stages: ["input"], ["output"], ["batch"]';
+COMMENT ON COLUMN custom_rules.target_files IS 'Glob patterns for code review rules';
 
 
 -- ── User behavior table ─────────────────────────────────────────────────────

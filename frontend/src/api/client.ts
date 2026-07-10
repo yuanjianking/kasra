@@ -97,6 +97,12 @@ export interface RuleItem {
   is_custom: boolean;
   category: string | null;
   group: string | null;
+  source?: string | null;
+  pattern_type?: string | null;
+  pattern_value?: string | null;
+  pattern_confidence?: string | null;
+  applicable_stages?: string[] | null;
+  target_files?: string[] | null;
 }
 
 export interface UserBehaviorPage {
@@ -129,7 +135,8 @@ export async function scanInput(content: string, userId?: string) {
 
 export async function getAuditLogs(params: {
   page?: number; page_size?: number; severity?: string;
-  direction?: string; rule_id?: string;
+  direction?: string; rule_id?: string; user_id?: string;
+  start_time?: string; end_time?: string;
 }) {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, String(v)); });
@@ -161,4 +168,88 @@ export async function updateRule(ruleId: string, data: { enabled?: boolean }): P
     method: 'PUT',
     body: JSON.stringify(data),
   });
+}
+
+export async function scanOutput(content: string, userId?: string) {
+  return request<ScanResult>('/v1/scan/output', {
+    method: 'POST',
+    body: JSON.stringify({ content, user_id: userId }),
+  });
+}
+
+export async function scanBatch(path: string, userId?: string) {
+  return request<{ results: BatchScanResult[]; summary: { total_findings: number; files_scanned: number } }>('/v1/scan/batch', {
+    method: 'POST',
+    body: JSON.stringify({ path, user_id: userId }),
+  });
+}
+
+export interface BatchScanResult {
+  file: string;
+  triggered_rules: TriggeredRule[];
+  error: string | null;
+}
+
+export interface ComplianceReport {
+  report_type: string;
+  generated_at: string;
+  total_events: number;
+  total_blocked: number;
+  total_warnings: number;
+  p0_count: number;
+  p1_count: number;
+  p2_count: number;
+  unique_users: number;
+  unique_rules: number;
+  date_range: { start: string; end: string };
+  top_rules: { rule_id: string; rule_name: string; count: number }[];
+}
+
+export async function getComplianceReport(start_time?: string, end_time?: string) {
+  const qs = new URLSearchParams();
+  if (start_time) qs.set('start_time', start_time);
+  if (end_time) qs.set('end_time', end_time);
+  return request<ComplianceReport>(`/v1/audit/report?${qs}`);
+}
+
+export async function exportAuditLogs(params: { page_size?: number; severity?: string; direction?: string }) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, String(v)); });
+  const apiKey = typeof window !== 'undefined' ? localStorage.getItem('kasra_api_key') : null;
+  const res = await fetch(`/v1/audit/export?${qs}`, {
+    headers: { 'X-API-Key': apiKey || '' },
+  });
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  return res.text();
+}
+
+export async function createRule(data: {
+  id: string; name: string; severity: string; action: string;
+  pattern_type?: string; pattern_value?: string;
+  applicable_stages?: string[]; target_files?: string[];
+}): Promise<RuleItem> {
+  return request<RuleItem>('/v1/rules', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteRule(ruleId: string): Promise<void> {
+  await fetch(`/v1/rules/${ruleId}`, {
+    method: 'DELETE',
+    headers: { 'X-API-Key': localStorage.getItem('kasra_api_key') || '' },
+  });
+}
+
+export interface HealthDetail {
+  status: string;
+  version: string;
+  database: { status: string; type: string; version: string; error: string | null };
+  https_proxy: { enabled: boolean; port: number };
+  rules_loaded: number;
+  audit_enabled: boolean;
+}
+
+export async function getHealthDetail() {
+  return request<HealthDetail>('/health');
 }

@@ -16,6 +16,7 @@ from app.database import engine, SessionLocal
 from app.models.audit_log import AuditLog
 from app.models.audit_chain import AuditChain
 from app.models.rule_config import RuleConfig
+from app.models.custom_rule import CustomRule
 from app.models.user import User
 from app.models.user_behavior import UserBehavior
 
@@ -117,7 +118,7 @@ class TestAuditChain:
             assert required in cols, f"Column {required} missing from audit_chain"
 
     def test_chain_created(self, client, auth_headers):
-        client.post("/v1/scan/input", json={"content": "密码是 chain-test", "user_id": "chain-u"}, headers=auth_headers)
+        client.post("/v1/scan/input", json={"content": "密码是 admin123!@#", "user_id": "chain-u"}, headers=auth_headers)
         db = SessionLocal()
         try:
             chain = db.query(AuditChain).order_by(AuditChain.id.desc()).first()
@@ -135,7 +136,7 @@ class TestAuditChain:
             db.close()
 
     def test_genesis_prev_hash(self, client, auth_headers):
-        client.post("/v1/scan/input", json={"content": "密码是 genesis-test", "user_id": "gen-u"}, headers=auth_headers)
+        client.post("/v1/scan/input", json={"content": "密码是 genesis123!@#", "user_id": "gen-u"}, headers=auth_headers)
         db = SessionLocal()
         try:
             first = db.query(AuditChain).order_by(AuditChain.id.asc()).first()
@@ -163,23 +164,32 @@ class TestRulesTable:
             db.close()
 
     def test_custom_rule_created(self, client, auth_headers):
-        client.post("/v1/rules", json={"id": "U-01", "name": "DB测试规则", "severity": "P1", "action": "warn"}, headers=auth_headers)
+        client.post("/v1/rules", json={
+            "id": "U-01", "name": "DB测试规则", "severity": "P1", "action": "warn",
+            "pattern_type": "keyword", "pattern_value": "测试关键词",
+            "applicable_stages": ["input"],
+        }, headers=auth_headers)
         db = SessionLocal()
         try:
-            rule = db.query(RuleConfig).filter(RuleConfig.id == "U-01").first()
+            # Custom rules now go into custom_rules table
+            rule = db.query(CustomRule).filter(CustomRule.id == "U-01").first()
             assert rule is not None
             assert rule.name == "DB测试规则"
-            assert rule.is_custom is True
-            assert rule.source == "user"
+            assert rule.pattern_type == "keyword"
+            assert rule.pattern_value == "测试关键词"
         finally:
             db.close()
 
     def test_custom_rule_deleted(self, client, auth_headers):
-        client.post("/v1/rules", json={"id": "U-01", "name": "Del", "severity": "P1", "action": "warn"}, headers=auth_headers)
+        client.post("/v1/rules", json={
+            "id": "U-01", "name": "Del", "severity": "P1", "action": "warn",
+            "pattern_type": "regex", "pattern_value": "del-test",
+            "applicable_stages": ["input"],
+        }, headers=auth_headers)
         client.delete("/v1/rules/U-01", headers=auth_headers)
         db = SessionLocal()
         try:
-            rule = db.query(RuleConfig).filter(RuleConfig.id == "U-01").first()
+            rule = db.query(CustomRule).filter(CustomRule.id == "U-01").first()
             assert rule is None
         finally:
             db.close()
