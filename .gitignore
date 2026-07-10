@@ -41,3 +41,5 @@ frontend/dist/
 # Build artifacts
 *.so
 *.dylib
+
+docs/

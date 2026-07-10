@@ -6,31 +6,31 @@ Making the AI-assisted coding process fully **visible, controllable, and auditab
 
 ---
 
-## Three Integration Methods
+## Integration Methods
 
 Kasra provides three integration methods for different use cases:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    Developer / System Access Methods                  │
+│                    Integration Methods                                │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  ┌─── Method 1: HTTP Proxy ──────────────────────────────────────┐  │
-│  │  export HTTP_PROXY=http://kasra:8080/v1/proxy                  │  │
-│  │  Covers: Claude Code / Copilot / Cursor / all HTTP traffic     │  │
-│  │  Feature: Full interception, zero dev effort, once configured  │  │
+│  ┌─── Method 1: Claude Code Hooks ───────────────────────────────┐  │
+│  │  .claude/settings.json → kasra-hook.sh                        │  │
+│  │  Covers: Claude Code (UserPrompt / PreTool / PostTool)        │  │
+│  │  Feature: Full input/output interception at the harness level  │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌─── Method 2: MCP Protocol ────────────────────────────────────┐  │
-│  │  Claude Desktop/IDE → MCP Server → Kasra Detection Engine     │  │
-│  │  Covers: Claude Desktop / Cursor / MCP-compatible AI tools    │  │
-│  │  Feature: Standardized protocol, unified AI tool interface     │  │
+│  │  kasra-mcp SSE on :8091 → kasra_scan_file                     │  │
+│  │  Covers: Code review (SEC/IAC rules) via AI tools              │  │
+│  │  Feature: Scan files/directories for security vulnerabilities  │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
-│  ┌─── Method 3: CLI Scanner ──────────────────────────────────────┐  │
-│  │  kasra-scan review ./src --format json                         │  │
-│  │  Covers: Code repos / CI/CD pipelines / pre-release checks     │  │
-│  │  Feature: No proxy needed, scans filesystem directly            │  │
+│  ┌─── Method 3: REST API ────────────────────────────────────────┐  │
+│  │  curl POST http://localhost:8090/v1/scan/...                   │  │
+│  │  Covers: Direct integration, CI/CD, custom tooling              │  │
+│  │  Feature: Full programmatic access to all features              │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -38,244 +38,274 @@ Kasra provides three integration methods for different use cases:
 
 ---
 
-### Method 1: HTTP Proxy (Zero-Friction Developer Integration)
+### Method 1: Claude Code Hooks (Automatic Interception)
 
-Developers only need to set environment variables — all AI tool traffic automatically passes through Kasra detection.
+The recommended way for Claude Code users. Register `kasra-hook.sh` in your Claude Code settings so every user prompt, tool invocation, and AI response is automatically scanned.
 
-```bash
-# Developer terminal configuration
-export HTTP_PROXY=http://kasra.company.com:8080/v1/proxy
-export HTTPS_PROXY=http://kasra.company.com:8080/v1/proxy
+**Configure in `.claude/settings.json.local` or `~/.claude/settings.json`:**
 
-# After configuration, all Claude Code / Copilot / Cursor requests are intercepted by Kasra
-# Detection flow:
-#   Developer → Claude Code
-#       → HTTP request enters Kasra proxy
-#       → Input detection (prevent leaks, prevent injection)
-#       → Safe → Forward to AI API
-#       → AI response received → Output detection (prevent dangerous code)
-#       → Log to audit trail
-#       → Return to developer
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": "bash /path/to/kasra/hooks/kasra-hook.sh input",
+    "PreToolUse": "bash /path/to/kasra/hooks/kasra-hook.sh input",
+    "PostToolUse": "bash /path/to/kasra/hooks/kasra-hook.sh output"
+  }
+}
 ```
 
-#### Direct REST API Calls
+**Detection flow per event:**
+
+| Hook Event | Timing | Detection | On Violation |
+|---|---|---|---|
+| `UserPromptSubmit` | Developer types a message | Input scan (I-series) | Blocked with dialog, message not sent |
+| `PreToolUse` | AI is about to run a tool | Input scan (I-series) | Tool denied, AI notified |
+| `PostToolUse` | AI returns a response | Output scan (O-series) | Warning shown to developer |
 
 ```bash
-# Input detection (before sending to AI)
-curl -X POST http://localhost:8080/v1/scan/input \
-  -H "Content-Type: application/json" \
-  -d '{"content": "my password is admin123", "user_id": "dev1"}'
-
-# Output detection (after AI response)
-curl -X POST http://localhost:8080/v1/scan/output \
-  -H "Content-Type: application/json" \
-  -d '{"content": "eval(user_input)", "user_id": "dev1"}'
-
-# Batch code repository scan
-curl -X POST http://localhost:8080/v1/scan/batch \
-  -H "Content-Type: application/json" \
-  -d '{"path": "./src"}'
-
-# View audit logs
-curl "http://localhost:8080/v1/audit/logs?page_size=10&severity=P0"
-
-# Dashboard data
-curl http://localhost:8080/v1/dashboard/summary
+# Environment variables for the hook (optional)
+export KASRA_API_URL=http://localhost:8090
+export KASRA_HOOK_API_KEY=your-api-key
 ```
 
 ---
 
-### Method 2: MCP Protocol (Native AI Tool Integration)
+### Method 2: MCP Protocol (Code Review)
 
-Kasra implements an MCP (Model Context Protocol) Server, allowing AI development tools to call Kasra's security detection capabilities directly.
+Kasra exposes a dedicated MCP SSE server on port `8091` for code security review.
 
-#### Claude Desktop Integration
+#### MCP Tools
 
-Register the Kasra MCP Server in Claude Desktop configuration:
+| Tool | Description | Parameters |
+|------|-------------|-----------|
+| `kasra_scan_file` | Scan a file or directory for security vulnerabilities | `path` |
+| `kasra_get_rules` | List all security rules with severity, action, and status | `severity?`, `enabled_only?` |
+| `health` | Check the RuleEngine health status | None |
+
+#### Claude Desktop / Cursor Integration
+
+```json
+{
+  "mcpServers": {
+    "kasra": {
+      "type": "sse",
+      "url": "http://localhost:8091/sse"
+    }
+  }
+}
+```
+
+Or via command:
 
 ```json
 {
   "mcpServers": {
     "kasra": {
       "command": "python",
-      "args": ["-m", "app.mcp_server"],
-      "env": {
-        "KASRA_ENGINE__MAX_CONCURRENT_RULES": "50"
-      }
+      "args": ["-m", "app.mcp_server"]
     }
   }
 }
 ```
 
-#### SSE (Server-Sent Events) Integration
+---
 
-Kasra's MCP SSE endpoint starts automatically with the main service:
+### Method 3: REST API (Direct Integration)
 
+Full programmatic access to all Kasra features.
+
+#### Content Detection
+
+```bash
+# Input detection — scan developer input before it reaches the AI
+curl -X POST http://localhost:8090/v1/scan/input \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"content": "my password is admin123", "user_id": "dev1"}'
+
+# Output detection — scan AI-generated responses
+curl -X POST http://localhost:8090/v1/scan/output \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"content": "eval(user_input)", "user_id": "dev1"}'
 ```
-http://localhost:8080/v1/mcp/sse
+
+#### Code Review
+
+```bash
+# Scan a file or directory for security vulnerabilities
+curl -X POST http://localhost:8090/v1/scan/batch \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"path": "./src", "user_id": "dev1"}'
 ```
 
-Compatible with Cursor, Continue.dev, and other MCP SSE-aware tools.
+#### Rule Management
 
-#### Kasra MCP Tools
+```bash
+# List all rules (with optional filters)
+curl "http://localhost:8090/v1/rules?group=input&severity=P0&page_size=20" \
+  -H "X-API-Key: your-api-key"
+
+# Get a single rule
+curl "http://localhost:8090/v1/rules/I-01" -H "X-API-Key: your-api-key"
+
+# Create a custom rule
+curl -X POST http://localhost:8090/v1/rules \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"id": "U-01", "name": "Custom Rule", "severity": "P1", "action": "warn"}'
+
+# Enable or disable a rule
+curl -X PUT http://localhost:8090/v1/rules/I-01 \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"enabled": false}'
+
+# Delete a custom rule or reset an SDK rule override
+curl -X DELETE http://localhost:8090/v1/rules/I-01 -H "X-API-Key: your-api-key"
+```
+
+#### Audit & Reports
+
+```bash
+# Query audit logs
+curl "http://localhost:8090/v1/audit/logs?page_size=10&severity=P0&direction=input" \
+  -H "X-API-Key: your-api-key"
+
+# Compliance report
+curl "http://localhost:8090/v1/audit/report" -H "X-API-Key: your-api-key"
+
+# CSV export
+curl "http://localhost:8090/v1/audit/export" -H "X-API-Key: your-api-key"
+```
+
+#### Dashboard
+
+```bash
+# Summary statistics
+curl "http://localhost:8090/v1/dashboard/summary" -H "X-API-Key: your-api-key"
+
+# Trend data (7d, 30d, 90d)
+curl "http://localhost:8090/v1/dashboard/trend?period=7d" -H "X-API-Key: your-api-key"
+
+# User behavior analysis
+curl "http://localhost:8090/v1/dashboard/users/behavior?user_id=dev1" \
+  -H "X-API-Key: your-api-key"
+```
+
+---
+
+## API Reference
+
+### REST Endpoints
+
+| Method | Path | Description | Auth |
+|--------|------|-------------|------|
+| `GET` | `/health` | Health check (includes DB, engine, proxy status) | No |
+| `GET` | `/metrics` | Prometheus metrics | No |
+| | | | |
+| `POST` | `/v1/scan/input` | Input content detection (I-series rules) | API Key |
+| `POST` | `/v1/scan/output` | Output content detection (O-series rules) | API Key |
+| `POST` | `/v1/scan/batch` | Code review — scan file or directory (SEC/IAC rules) | API Key |
+| | | | |
+| `GET` | `/v1/rules` | List all rules (supports `group`, `severity`, `enabled_only`, `custom_only`, pagination) | API Key |
+| `GET` | `/v1/rules/{rule_id}` | Get a single rule by ID | API Key |
+| `POST` | `/v1/rules` | Create a custom rule (U-series only) | API Key |
+| `PUT` | `/v1/rules/{rule_id}` | Update a rule (enable/disable, change severity, etc.) | API Key |
+| `DELETE` | `/v1/rules/{rule_id}` | Delete a custom rule or reset an SDK override | API Key |
+| | | | |
+| `GET` | `/v1/audit/logs` | Query audit logs (supports `user_id`, `severity`, `direction`, pagination) | API Key |
+| `GET` | `/v1/audit/report` | Compliance report summary | API Key |
+| `GET` | `/v1/audit/export` | CSV export of audit logs | API Key |
+| | | | |
+| `GET` | `/v1/dashboard/summary` | 24-hour summary statistics | API Key |
+| `GET` | `/v1/dashboard/trend` | Trend data by period (7d/30d/90d) | API Key |
+| `GET` | `/v1/dashboard/users/behavior` | User behavior analysis | API Key |
+| | | | |
+| `ALL` | `/v1/proxy/{path}` | HTTP proxy forwarding to upstream AI APIs | API Key |
+
+### MCP Tools
 
 | Tool | Description | Parameters |
 |------|-------------|-----------|
-| `kasra_scan_input` | Scan developer input (before sending to AI) | `content`, `user_id?` |
-| `kasra_scan_output` | Scan AI output (before returning to developer) | `content`, `user_id?` |
-| `kasra_scan_prompt` | Simultaneous scan of input+output | `prompt`, `response?`, `user_id?` |
-| `kasra_scan_file` | Scan file/directory for security vulnerabilities | `path` |
-| `kasra_get_rules` | List all security rules | `category?`, `severity?`, `enabled_only?` |
-| `kasra_health` | Check engine health status | None |
+| `kasra_scan_file` | Scan a file or directory for security vulnerabilities (SEC/IAC rules) | `path` |
+| `kasra_get_rules` | List all loaded rules | `severity?`, `enabled_only?` |
+| `health` | Engine health check | None |
 
-#### Direct Usage via stdio
-
-```bash
-# Start MCP stdio server
-python -m app.mcp_server
-
-# Invoke from CI/CD
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"kasra_scan_file","arguments":{"path":"./src"}}}' | python -m app.mcp_server
-```
-
----
-
-### Method 3: CLI Scanner (Code Repository / CI Integration)
-
-The Kasra SDK includes a full-featured CLI tool `kasra-scan`, suitable for local development or CI/CD pipeline code scanning.
-
-```bash
-# Scan entire project
-kasra-scan review ./src
-
-# JSON format output (suitable for CI integration)
-kasra-scan review ./src --json
-
-# View only P0 severity issues
-kasra-scan review ./src --severity P0
-
-# Input detection
-kasra-scan input "my password is secret123"
-
-# View engine status
-kasra-scan info
-kasra-scan health
-kasra-scan metrics
-```
-
-CI/CD usage (GitHub Actions example):
-
-```yaml
-- name: Security Scan
-  run: |
-    pip install kasra-sdk
-    kasra-scan review ./src --json --severity P0 > report.json
-    if [ $(jq '.findings | length' report.json) -gt 0 ]; then
-      echo "Security risks found!"
-      cat report.json
-      exit 1
-    fi
-```
-
----
-
-## Core Features
-
-### Input Detection (I-Series Rules)
-
-| Rule | Detection Target | Action | Severity |
-|------|-----------------|--------|----------|
-| I-01 | GitHub Token (ghp_) | Block | P0 |
-| I-02 | OpenAI API Key (sk-) | Block | P0 |
-| I-03 | Anthropic API Key | Block | P0 |
-| I-04 | AWS Access Key (AKIA) | Block | P0 |
-| I-05 | Generic Password/Secret | Block | P0 |
-| I-08 | Phone Number | Redact | P1 |
-| I-09 | National ID Number | Redact | P1 |
-| I-11 | Prompt Injection Attack | Block | P0 |
-| I-12 | Jailbreak/Role-Play Attack | Block | P0 |
-
-### Output Detection (O-Series Rules)
-
-| Rule | Detection Target | Action | Severity |
-|------|-----------------|--------|----------|
-| O-01 | Dangerous Function Call (eval/exec) | Warn | P0 |
-| O-02 | Dangerous Shell Command (rm -rf /) | Block | P0 |
-| O-03 | Credential Leak in Output | Block | P0 |
-| O-04 | SQL Concatenation (non-parameterized) | Warn | P2 |
-
-### Code Batch Scan (SEC/IAC/ARCH Rules)
-
-Covers SQL injection, XSS, SSRF, path traversal, hardcoded secrets, Dockerfile security, K8s configuration, and **110+ rules** total.
-
-### Audit & Compliance
-
-- All detection events automatically logged to audit trail
-- Compliance report export (CSV/JSON) with one click
-- Hash chain ensures audit log tamper-proof integrity
-
----
-
-## Web Dashboard
-
-Open `http://localhost:8080` to access the Web console:
-
-| Page | Features |
-|------|----------|
-| 📊 **Dashboard** | 24h statistics, block rate, trend chart, top rules/users |
-| 📋 **Audit Logs** | Paginated queries, severity/direction filtering |
-| 🛡️ **Rule Management** | 110+ rule list, enable/disable, custom rules |
-| 👤 **User Behavior** | User behavior analysis, anomaly scores |
-
----
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check (includes DB status) |
-| `POST` | `/v1/scan/input` | Input detection |
-| `POST` | `/v1/scan/output` | Output detection |
-| `POST` | `/v1/scan/batch` | Batch code scan |
-| `GET` | `/v1/audit/logs` | Audit log query |
-| `GET` | `/v1/audit/report` | Compliance report |
-| `GET/POST/PUT/DELETE` | `/v1/rules` | Rule CRUD |
-| `GET` | `/v1/dashboard/summary` | Dashboard summary |
-| `GET` | `/v1/dashboard/trend` | Trend data |
-| `GET` | `/v1/dashboard/users/behavior` | User behavior analysis |
-| `ALL` | `/v1/proxy/{path}` | HTTP proxy forwarding |
-| `SSE` | `/v1/mcp/sse` | MCP Server (SSE protocol) |
-
-Full API documentation: `http://localhost:8080/docs`
+Full interactive API documentation: `http://localhost:8090/docs`
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install
-pip install -e .
-
-# Start service (development mode)
-uvicorn app.main:app --reload --port 8080
-
-# Verify
-curl http://localhost:8080/health
-
-# Test detection
-curl -X POST http://localhost:8080/v1/scan/input \
-  -H "Content-Type: application/json" \
-  -d '{"content": "export GITHUB_TOKEN=ghp_abc123def456", "user_id": "test"}'
-# → {"blocked": true, ...}
-```
-
-## Docker Deployment
-
-```bash
-# Development mode (SQLite)
+# Start service (development mode with SQLite)
 docker compose up -d
 
-# Production mode (PostgreSQL)
-export POSTGRES_PASSWORD=your-strong-password
-docker compose --profile production up -d
+# Verify
+curl http://localhost:8090/health
+
+# Test input detection
+curl -X POST http://localhost:8090/v1/scan/input \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-api-key-change-in-production" \
+  -d '{"content": "export GITHUB_TOKEN=ghp_abc123def456", "user_id": "test"}'
+# → {"blocked": true, ...}
+
+# Open web dashboard
+open http://localhost:8080
+```
+
+## Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **kasra-api** | `:8090` | FastAPI REST API + HTTPS CONNECT proxy (`:8443`) |
+| **kasra-frontend** | `:8080` | React SPA web dashboard |
+| **kasra-mcp** | `:8091` | MCP SSE server (code review tools) |
+| **postgres** | `:5432` | PostgreSQL database |
+| **adminer** | `:8083` | Database administration UI |
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Kasra Platform                                  │
+│                                                                     │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
+│  │  REST API    │  │  MCP Server  │  │  CONNECT     │              │
+│  │  (:8090)     │  │  (:8091)     │  │  Proxy       │              │
+│  └──────┬───────┘  └──────┬───────┘  │  (:8443)     │              │
+│         │                │           └──────┬───────┘              │
+│         ▼                ▼                  ▼                      │
+│  ┌─────────────────────────────────────────────────────┐          │
+│  │              Rule Engine (kasra-sdk)                  │          │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐     │          │
+│  │  │ Input    │ │ Output   │ │ Code Review      │     │          │
+│  │  │ Pipeline │ │ Pipeline │ │ (SEC/IAC rules)  │     │          │
+│  │  └──────────┘ └──────────┘ └──────────────────┘     │          │
+│  │  110+ security rules across 10 series               │          │
+│  └─────────────────────────────────────────────────────┘          │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────┐          │
+│  │  PostgreSQL (audit_logs, rules_config, users, ...)  │          │
+│  └─────────────────────────────────────────────────────┘          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Development
+
+```bash
+# Install SDK in development mode
+pip install -e ../kasra-sdk
+
+# Install app in development mode
+pip install -e .
+
+# Run with hot reload
+uvicorn app.main:app --reload --port 8090
+
+# Run tests
+python -m pytest tests/ -v
 ```
