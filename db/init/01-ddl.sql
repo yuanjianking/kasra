@@ -55,28 +55,60 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_date     ON audit_logs (user_id, 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_rule_date     ON audit_logs (rule_id, timestamp DESC);
 
 
+-- ── Rule categories (master table) ──────────────────────────────────────────
+-- I = Input Detection, O = Output Detection, SEC = Code Security, IAC = Infrastructure as Code
+CREATE TABLE IF NOT EXISTS categories (
+    id              SERIAL PRIMARY KEY,
+    name            VARCHAR(50) NOT NULL UNIQUE,
+    label           VARCHAR(100) NOT NULL,
+    description     TEXT,
+    color           VARCHAR(7) DEFAULT '#6366f1',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
+-- ── Detection pattern types (master table) ──────────────────────────────────
+-- regex, keyword, dictionary, yaml_path, dockerfile, keyvalue
+CREATE TABLE IF NOT EXISTS pattern_types (
+    id              SERIAL PRIMARY KEY,
+    name            VARCHAR(50) NOT NULL UNIQUE,
+    label           VARCHAR(100) NOT NULL,
+    description     TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
 -- ── Rule configuration table ─────────────────────────────────────────────────
--- SDK built-in rule enabled/disabled override state (custom rules go in custom_rules table)
+-- SDK built-in rule definitions (seeded from JSON bundles via import)
+-- Custom user rules go in custom_rules table
 CREATE TABLE IF NOT EXISTS rules (
-    id              VARCHAR(32) PRIMARY KEY,          -- I-01, SEC-06, U-01
+    id              VARCHAR(50) PRIMARY KEY,          -- I-01, SEC-06
     name            VARCHAR(256) NOT NULL,
     description     TEXT,
-    category        VARCHAR(64),                       -- credential_leak, pii, injection, security, iac, arch
     severity        VARCHAR(4) NOT NULL DEFAULT 'P2' CHECK (severity IN ('P0', 'P1', 'P2')),
     action          VARCHAR(16) NOT NULL DEFAULT 'warn' CHECK (action IN ('block', 'warn', 'redact', 'clean', 'truncate', 'soft_allow', 'dynamic')),
-    pattern         TEXT,                               -- regex or JSON pattern definition
+
+    -- Classification
+    category_id     INTEGER REFERENCES categories(id),
+    rule_type       VARCHAR(20) NOT NULL DEFAULT 'io',  -- io | code_review | behavior
+    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+
+    -- Detection config (JSON: mode, patterns, target_files)
+    detection_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+
+    -- Metadata
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
-    is_custom       BOOLEAN NOT NULL DEFAULT FALSE,
     source          VARCHAR(64) DEFAULT 'sdk',          -- sdk / user
-    metadata        JSONB DEFAULT '{}'::jsonb,
+    bundle_series   VARCHAR(20),                        -- I, O, SEC, IAC
+    sdk_version     INTEGER DEFAULT 1,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_rules_severity   ON rules (severity);
-CREATE INDEX IF NOT EXISTS idx_rules_category   ON rules (category);
+CREATE INDEX IF NOT EXISTS idx_rules_category   ON rules (category_id);
 CREATE INDEX IF NOT EXISTS idx_rules_enabled    ON rules (enabled);
-CREATE INDEX IF NOT EXISTS idx_rules_custom     ON rules (is_custom) WHERE is_custom = TRUE;
+CREATE INDEX IF NOT EXISTS idx_rules_type       ON rules (rule_type);
 
 -- ── Custom rules table ───────────────────────────────────────────────────────
 -- User-defined detection rules with full detection config
@@ -84,20 +116,24 @@ CREATE TABLE IF NOT EXISTS custom_rules (
     id              VARCHAR(32) PRIMARY KEY,          -- U-01, U-02, ...
     name            VARCHAR(256) NOT NULL,
     description     TEXT,
-    category        VARCHAR(64),                       -- custom, credential_leak, pii, ...
     severity        VARCHAR(4) NOT NULL DEFAULT 'P2',  -- P0 / P1 / P2
     action          VARCHAR(16) NOT NULL DEFAULT 'warn', -- block / warn / redact / clean
 
-    -- Detection method
-    pattern_type    VARCHAR(32) NOT NULL DEFAULT 'regex',   -- regex / keyword
-    pattern_value   TEXT NOT NULL DEFAULT '',               -- the regex or keyword text
-    pattern_confidence VARCHAR(10) DEFAULT '0.8',
+    -- Classification
+    category_id     INTEGER REFERENCES categories(id),
+    rule_type       VARCHAR(20) NOT NULL DEFAULT 'io',  -- io | code_review | behavior
+    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+    target_files    JSONB,                              -- ["**/*.py"] for code review
 
-    -- Rule classification
-    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,  -- ["input"], ["output"], ["batch"]
-    target_files    JSONB,                                   -- ["**/*.py"] for code review
+    -- Detection method
+    pattern_type_id INTEGER REFERENCES pattern_types(id),
+    pattern_type    VARCHAR(32) NOT NULL DEFAULT 'regex',   -- regex / keyword (legacy)
+    pattern_value   TEXT NOT NULL DEFAULT '',
+    pattern_confidence VARCHAR(10) DEFAULT '0.8',
+    detection_config JSONB,                                -- full JSON for advanced editing
 
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by      VARCHAR(100),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -190,10 +226,14 @@ COMMENT ON COLUMN audit_logs.direction IS 'Detection direction: input/output/bat
 COMMENT ON COLUMN audit_logs.status    IS 'Processing status: pending/resolved/fp (false positive)';
 COMMENT ON COLUMN audit_logs.gdpr_relevant IS 'Whether GDPR compliance is relevant';
 
-COMMENT ON TABLE  rules           IS 'Rule configuration — SDK built-in rules + user custom rules';
-COMMENT ON COLUMN rules.id        IS 'Rule ID range: I-01 ~ I-57, O-01 ~ O-53, SEC-01 ~ SEC-83, U-01 ~ U-99';
-COMMENT ON COLUMN rules.is_custom IS 'Whether this is a user-created custom rule';
-COMMENT ON COLUMN rules.source    IS 'Rule source: sdk (engine built-in) / user (user-created)';
+COMMENT ON TABLE  categories      IS 'Rule categories master: I, O, SEC, IAC, BEHAVIOR';
+COMMENT ON TABLE  pattern_types   IS 'Detection pattern types master: regex, keyword, yaml_path, ...';
+
+COMMENT ON TABLE  rules           IS 'SDK built-in rules — seeded from JSON bundles';
+COMMENT ON COLUMN rules.id        IS 'Rule ID: I-01 ~ I-57, O-01 ~ O-53, SEC-01 ~ SEC-83';
+COMMENT ON COLUMN rules.category_id IS 'FK to categories table';
+COMMENT ON COLUMN rules.rule_type IS 'io / code_review / behavior';
+COMMENT ON COLUMN rules.bundle_series IS 'Source bundle series: I, O, SEC, IAC';
 
 COMMENT ON TABLE  user_behavior     IS 'User behavior — daily activity summary';
 COMMENT ON COLUMN user_behavior.anomaly_score IS 'Anomaly score 0-100, higher = more suspicious';

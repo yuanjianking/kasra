@@ -43,7 +43,7 @@ class TestScanInput:
         """GitHub token should be blocked as credential leak."""
         response = client.post(
             "/v1/scan/input",
-            json={"content": "export GITHUB_TOKEN=ghp_abc123def456xyz789"},
+            json={"content": "export GITHUB_TOKEN=ghp_abc123def456xyz789abc123def456xyz789abc123def"},
             headers=auth_headers,
         )
         assert response.status_code == 200

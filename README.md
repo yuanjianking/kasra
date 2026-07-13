@@ -211,11 +211,13 @@ curl "http://localhost:8090/v1/dashboard/users/behavior?user_id=dev1" \
 | | | | |
 | `GET` | `/v1/rules` | List all rules (supports `group`, `severity`, `enabled_only`, `custom_only`, pagination) | API Key |
 | `GET` | `/v1/rules/{rule_id}` | Get a single rule by ID | API Key |
-| `POST` | `/v1/rules` | Create a custom rule (U-series only) | API Key |
+| `POST` | `/v1/rules` | Create a custom rule (`pattern_type`, `pattern_value`, `applicable_stages`, `target_files`) | API Key |
 | `PUT` | `/v1/rules/{rule_id}` | Update a rule (enable/disable, change severity, etc.) | API Key |
 | `DELETE` | `/v1/rules/{rule_id}` | Delete a custom rule or reset an SDK override | API Key |
 | | | | |
-| `GET` | `/v1/audit/logs` | Query audit logs (supports `user_id`, `severity`, `direction`, pagination) | API Key |
+| `GET` | `/v1/audit/logs` | Query audit logs (`user_id`, `severity`, `direction`, `status`, `start_time`, `end_time`, pagination) | API Key |
+| `PATCH` | `/v1/audit/logs/{id}` | Update audit log status (`pending` / `resolved` / `fp`) | API Key |
+| `POST` | `/v1/audit/logs/batch-update` | Batch update audit log statuses | API Key |
 | `GET` | `/v1/audit/report` | Compliance report summary | API Key |
 | `GET` | `/v1/audit/export` | CSV export of audit logs | API Key |
 | | | | |
@@ -285,7 +287,7 @@ open http://localhost:8080
 │  │  │ Input    │ │ Output   │ │ Code Review      │     │          │
 │  │  │ Pipeline │ │ Pipeline │ │ (SEC/IAC rules)  │     │          │
 │  │  └──────────┘ └──────────┘ └──────────────────┘     │          │
-│  │  110+ security rules across 10 series               │          │
+│  │  110+ SDK rules + custom rules (created via UI/API)               │          │
 │  └─────────────────────────────────────────────────────┘          │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────┐          │

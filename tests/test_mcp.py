@@ -8,12 +8,49 @@ import tempfile
 
 import pytest
 
+from kasra import RuleEngine
+from kasra.models.enums import Severity, ActionType, MatchMode, PatternType
+from kasra.models.rule import RuleDefinition, DetectionConfig, PatternDefinition
+
 from app.mcp_server import (
     health,
     scan_file,
     get_rules,
 )
 from app.services.engine_service import engine_service
+
+
+@pytest.fixture(autouse=True)
+def _ensure_mcp_engine():
+    """Ensure the MCP engine has rules loaded for tests."""
+    if not engine_service.is_initialized:
+        engine_service.initialize()
+    engine = engine_service.engine
+    if engine.rule_count == 0:
+        rule = RuleDefinition(
+            id="I-01", name="Password Check", description="test",
+            category="test", severity=Severity.P0, action=ActionType.BLOCK,
+            applicable_stages=["input"],
+            detection=DetectionConfig(
+                mode=MatchMode.ANY,
+                patterns=[PatternDefinition(type=PatternType.REGEX, value=r"password\s*[:=]\s*\w+", confidence=0.9)],
+            ),
+        )
+        engine.load_rules_from_list([rule])
+        # Also inject a CR rule into the scanner
+        scanner = engine._get_code_review_scanner()
+        scanner.set_rules([{
+            "id": "SEC-01", "name": "Test CR Rule",
+            "category": "test", "severity": "P0", "action": "warn",
+            "target_files": ["**/*"],
+            "detection_method": "regex", "fp_risk": "medium",
+            "performance": "high", "priority": 3,
+            "detection": {"mode": "any", "patterns": [
+                {"type": "regex", "value": r"rm\s+-rf\s+/", "confidence": 0.9},
+                {"type": "regex", "value": r"subprocess\.call", "confidence": 0.8},
+            ]},
+        }])
+    yield
 
 
 class TestMcpHealth:
@@ -30,18 +67,14 @@ class TestMcpHealth:
         """Health should include loaded rules count when healthy."""
         result = health()
         data = json.loads(result)
-        if data["status"] == "healthy":
-            assert "rules_loaded" in data
-            assert data["rules_loaded"] > 0
+        assert data["status"] == "healthy"
+        assert "rules_loaded" in data
+        assert data["rules_loaded"] >= 1
 
     def test_health_contains_timestamp(self):
         """Health should include a timestamp when engine is initialized."""
-        # Ensure engine is initialized so health returns full data
-        if not engine_service.is_initialized:
-            engine_service.initialize()
         result = health()
         data = json.loads(result)
-        # Engine should be healthy now
         assert data["status"] == "healthy"
         assert "timestamp" in data
 

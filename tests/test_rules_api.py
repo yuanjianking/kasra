@@ -48,13 +48,13 @@ class TestRulesAPI:
 
     def test_list_rules_filter_by_category(self, client: TestClient, auth_headers):
         response = client.get(
-            "/v1/rules?category=credential_leak",
+            "/v1/rules?category=I",
             headers=auth_headers,
         )
         assert response.status_code == 200
         data = response.json()
         for rule in data["items"]:
-            assert rule["category"] == "credential_leak"
+            assert rule["category"] == "I"
 
     def test_list_rules_filter_enabled_only(self, client: TestClient, auth_headers):
         response = client.get(
@@ -66,12 +66,15 @@ class TestRulesAPI:
         for rule in data["items"]:
             assert rule["enabled"] is True
 
-    def test_list_rules_invalid_severity_rejected(self, client: TestClient, auth_headers):
+    def test_list_rules_invalid_severity_filter(self, client: TestClient, auth_headers):
+        """Unknown severity returns empty list, not error."""
         response = client.get(
             "/v1/rules?severity=P5",
             headers=auth_headers,
         )
-        assert response.status_code == 422
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
 
     # ── Get single rule ──
 

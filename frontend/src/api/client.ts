@@ -136,7 +136,7 @@ export async function scanInput(content: string, userId?: string) {
 export async function getAuditLogs(params: {
   page?: number; page_size?: number; severity?: string;
   direction?: string; rule_id?: string; user_id?: string;
-  start_time?: string; end_time?: string;
+  start_time?: string; end_time?: string; status?: string;
 }) {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => { if (v) qs.set(k, String(v)); });
@@ -252,4 +252,18 @@ export interface HealthDetail {
 
 export async function getHealthDetail() {
   return request<HealthDetail>('/health');
+}
+
+export async function updateAuditLogStatus(logId: number, status: string) {
+  return request(`/v1/audit/logs/${logId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function batchUpdateAuditLogStatus(ids: number[], status: string) {
+  return request<{ updated: number }>('/v1/audit/logs/batch-update', {
+    method: 'POST',
+    body: JSON.stringify({ ids, status }),
+  });
 }

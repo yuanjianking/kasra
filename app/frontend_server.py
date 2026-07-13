@@ -97,8 +97,32 @@ async def proxy_health(request: Request) -> Response:
 
 frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
-    logger.info("Frontend static files served from %s", frontend_dist)
+    from starlette.staticfiles import StaticFiles as StarletteStaticFiles
+
+    # Serve assets (JS, CSS, images) directly — no fallback.
+    app.mount(
+        "/assets",
+        StarletteStaticFiles(directory=str(frontend_dist / "assets")),
+        name="assets",
+    )
+
+    # Catch-all SPA fallback: any unmatched GET route → index.html
+    import html as html_mod
+
+    index_html_path = frontend_dist / "index.html"
+    index_content: str | None = None
+    if index_html_path.exists():
+        index_content = index_html_path.read_text(encoding="utf-8")
+        logger.info("Frontend SPA fallback loaded from %s", index_html_path)
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_fallback(full_path: str):
+        # Let the API proxy handle /v1/* and /health
+        if full_path.startswith("v1/") or full_path == "health":
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+        if index_content is not None:
+            return Response(content=index_content, media_type="text/html")
+        return JSONResponse(status_code=404, content={"detail": "Frontend not built"})
 else:
     logger.warning("Frontend dist not found at %s", frontend_dist)
 

@@ -2,26 +2,28 @@
 # Kasra — Enterprise Multi-Stage Docker Build
 # =============================================================================
 # Stages:
-#   1. sdk-builder     — Build kasra-sdk wheel (cloned from GitHub)
+#   1. sdk-builder     — Build kasra-sdk wheel (from local source)
 #   2. app-builder     — Build app wheel + install Python deps
 #   3. frontend-builder — Build React frontend static files
 #   4. production      — Minimal runtime image (non-root, read-only rootfs)
 # =============================================================================
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Stage 1: SDK Builder — Build kasra-sdk from GitHub source
+# Stage 1: SDK Builder — Build kasra-sdk from local source
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM python:3.11-slim AS sdk-builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends git && \
-    rm -rf /var/lib/apt/lists/*
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
+RUN pip install --no-cache-dir --timeout=120 --retries=5 -i "$PIP_INDEX_URL" --upgrade pip wheel setuptools
 
 WORKDIR /build
 
-# Clone SDK and build wheel
-RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
-    pip wheel --no-cache-dir --wheel-dir /build/wheels \
-        "git+https://github.com/yuanjianking/kasra-sdk.git"
+# Copy SDK source from local repo (no GitHub needed)
+COPY kasra-sdk/ ./kasra-sdk/
+
+# Build SDK wheel
+RUN pip wheel --no-cache-dir --timeout=120 --retries=5 -i "$PIP_INDEX_URL" --wheel-dir /build/wheels ./kasra-sdk
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -29,26 +31,26 @@ RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
 # ═══════════════════════════════════════════════════════════════════════════════
 FROM python:3.11-slim AS app-builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends gcc curl git && \
+RUN apt-get update && apt-get install -y --no-install-recommends gcc && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
-# Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip wheel setuptools hatchling
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
-# Copy SDK wheels from previous stage
+RUN pip install --no-cache-dir --timeout=120 --retries=5 -i "$PIP_INDEX_URL" --upgrade pip wheel setuptools hatchling
+
+# Copy SDK wheel from builder
 COPY --from=sdk-builder /build/wheels /build/sdk-wheels
 
-# Copy app source
-COPY pyproject.toml README.md ./
-COPY app/ ./app/
+# Copy app source (prefixed with kasra/ since build context is parent dir)
+COPY kasra/pyproject.toml kasra/README.md ./
+COPY kasra/app/ ./app/
 
-# Install ALL app dependencies including SDK (from cached wheel) and PostgreSQL support
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir \
-        --find-links /build/sdk-wheels \
-        -e ".[postgres,prod]"
+# Install SDK from prebuilt wheel, then the app without git dependency
+RUN pip install --no-cache-dir --no-index --find-links /build/sdk-wheels kasra-sdk && \
+    sed -i '/kasra-sdk/d' pyproject.toml && \
+    pip install --no-cache-dir --timeout=120 --retries=5 -i "$PIP_INDEX_URL" -e ".[postgres,prod]"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -58,12 +60,10 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /build/frontend
 
-# Copy only dependency files first (layer caching)
-COPY frontend/package.json frontend/package-lock.json ./
+COPY kasra/frontend/package.json kasra/frontend/package-lock.json ./
 RUN npm ci --quiet
 
-# Copy source and build
-COPY frontend/ ./
+COPY kasra/frontend/ ./
 RUN npm run build
 
 
@@ -85,7 +85,6 @@ RUN groupadd -r -g 1001 kasra && \
     mkdir -p /app /data /config && \
     chown -R kasra:kasra /app /data /config
 
-# Runtime deps (curl for healthcheck, ca-certificates for HTTPS)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
@@ -100,8 +99,11 @@ COPY --from=app-builder /build/pyproject.toml /app/
 # Copy frontend static files
 COPY --from=frontend-builder /build/frontend/dist /app/frontend/dist
 
-# Copy deploy scripts (healthcheck, backup)
-COPY deploy/scripts/ /scripts/
+# Copy DDL/DML SQL files (rule seed data)
+COPY kasra/db/ /app/db/
+
+# Copy deploy scripts
+COPY kasra/deploy/scripts/ /scripts/
 
 WORKDIR /app
 

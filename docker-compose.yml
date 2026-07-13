@@ -17,8 +17,8 @@ services:
   # ── REST API server ──────────────────────────────────────────────────────
   kasra-api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: kasra/Dockerfile
       target: production
     image: kasra:latest
     container_name: kasra-api
@@ -101,20 +101,11 @@ services:
     volumes:
       - ./config:/config:ro
     environment:
-      - KASRA_APP_DATABASE_URL=postgresql+psycopg2://kasra:${POSTGRES_PASSWORD:?Must set POSTGRES_PASSWORD}@postgres:5432/kasra
-      - KASRA_APP_API_KEY=${KASRA_API_KEY:?Must set KASRA_API_KEY}
-      - KASRA_APP_JWT_SECRET=${KASRA_JWT_SECRET:?Must set KASRA_JWT_SECRET}
       - KASRA_MCP_PORT=8091
       - KASRA_MCP_HOST=0.0.0.0
       - KASRA_ENGINE__MAX_CONCURRENT_RULES=${KASRA_ENGINE_MAX_CONCURRENT:-50}
-      - KASRA_AUDIT__ENABLED=true
-      - KASRA_AUDIT__JSONL_PATH=/data/kasra-audit.jsonl
-      - KASRA_APP_DATA_DIR=/data
       - KASRA_APP_LOG_LEVEL=${KASRA_LOG_LEVEL:-info}
     command: python -m app.mcp_server
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -sf -o /dev/null --max-time 3 http://localhost:8091/sse || exit 1"]
@@ -158,8 +149,6 @@ services:
   adminer:
     image: adminer:latest
     container_name: kasra-adminer
-    profiles:
-      - adminer
     ports:
       - "${KASRA_ADMINER_PORT:-8083}:8080"
     depends_on:

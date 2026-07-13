@@ -192,3 +192,24 @@ def export_csv(
         ])
 
     return output.getvalue()
+
+
+def update_log(db: DBSession, log_id: int, status: str | None = None) -> AuditLogSchema | None:
+    """Update a single audit log entry (e.g. mark as resolved / fp)."""
+    log = db.query(AuditLog).filter(AuditLog.id == log_id).first()
+    if not log:
+        return None
+    if status is not None:
+        log.status = status
+    db.commit()
+    db.refresh(log)
+    return AuditLogSchema.model_validate(log)
+
+
+def batch_update_logs(db: DBSession, ids: list[int], status: str | None = None) -> int:
+    """Batch update audit log entries."""
+    count = db.query(AuditLog).filter(AuditLog.id.in_(ids)).update(
+        {"status": status}, synchronize_session=False
+    )
+    db.commit()
+    return count

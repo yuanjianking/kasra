@@ -31,19 +31,40 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_ts ON audit_logs (timestamp DESC);
 
+-- ── categories ──
+CREATE TABLE IF NOT EXISTS categories (
+    id              SERIAL PRIMARY KEY,
+    name            VARCHAR(50) NOT NULL UNIQUE,
+    label           VARCHAR(100) NOT NULL,
+    description     TEXT,
+    color           VARCHAR(7) DEFAULT '#6366f1',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── pattern_types ──
+CREATE TABLE IF NOT EXISTS pattern_types (
+    id              SERIAL PRIMARY KEY,
+    name            VARCHAR(50) NOT NULL UNIQUE,
+    label           VARCHAR(100) NOT NULL,
+    description     TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── rules ──
 CREATE TABLE IF NOT EXISTS rules (
-    id              VARCHAR(32) PRIMARY KEY,
+    id              VARCHAR(50) PRIMARY KEY,
     name            VARCHAR(256) NOT NULL,
     description     TEXT,
-    category        VARCHAR(64),
     severity        VARCHAR(4) NOT NULL DEFAULT 'P2',
     action          VARCHAR(16) NOT NULL DEFAULT 'warn',
-    pattern         TEXT,
+    category_id     INTEGER REFERENCES categories(id),
+    rule_type       VARCHAR(20) NOT NULL DEFAULT 'io',
+    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+    detection_config JSONB NOT NULL DEFAULT '{}'::jsonb,
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
-    is_custom       BOOLEAN NOT NULL DEFAULT FALSE,
     source          VARCHAR(64) DEFAULT 'sdk',
-    metadata        JSONB DEFAULT '{}'::jsonb,
+    bundle_series   VARCHAR(20),
+    sdk_version     INTEGER DEFAULT 1,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -53,20 +74,19 @@ CREATE TABLE IF NOT EXISTS custom_rules (
     id              VARCHAR(32) PRIMARY KEY,          -- U-01, U-02, ...
     name            VARCHAR(256) NOT NULL,
     description     TEXT,
-    category        VARCHAR(64),                       -- custom, credential_leak, pii, ...
-    severity        VARCHAR(4) NOT NULL DEFAULT 'P2',  -- P0 / P1 / P2
-    action          VARCHAR(16) NOT NULL DEFAULT 'warn', -- block / warn / redact / clean
-
-    -- Detection method
-    pattern_type    VARCHAR(32) NOT NULL DEFAULT 'regex',   -- regex / keyword
-    pattern_value   TEXT NOT NULL DEFAULT '',               -- the regex or keyword text
+    severity        VARCHAR(4) NOT NULL DEFAULT 'P2',
+    action          VARCHAR(16) NOT NULL DEFAULT 'warn',
+    category_id     INTEGER REFERENCES categories(id),
+    rule_type       VARCHAR(20) NOT NULL DEFAULT 'io',
+    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,
+    target_files    JSONB,
+    pattern_type_id INTEGER REFERENCES pattern_types(id),
+    pattern_type    VARCHAR(32) NOT NULL DEFAULT 'regex',
+    pattern_value   TEXT NOT NULL DEFAULT '',
     pattern_confidence VARCHAR(10) DEFAULT '0.8',
-
-    -- Rule classification
-    applicable_stages JSONB NOT NULL DEFAULT '[]'::jsonb,  -- ["input"], ["output"], ["batch"]
-    target_files    JSONB,                                   -- ["**/*.py"] for code review
-
+    detection_config JSONB,
     enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by      VARCHAR(100),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

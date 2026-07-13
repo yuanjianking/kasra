@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
@@ -16,6 +17,30 @@ from app.schemas.audit import (
 from app.services import audit_service
 
 router = APIRouter(prefix="/v1/audit", tags=["Audit"])
+
+
+VALID_STATUSES = {"pending", "resolved", "fp"}
+
+
+class AuditLogUpdate(BaseModel):
+    """Update a single audit log entry."""
+    status: str | None = None  # pending / resolved / fp
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str | None) -> str | None:
+        if v is not None and v not in {"pending", "resolved", "fp"}:
+            raise ValueError(f"Invalid status: {v}. Must be pending, resolved, or fp")
+        return v
+
+    class Config:
+        json_schema_extra = {"enum": list(VALID_STATUSES)}
+
+
+class BatchUpdateRequest(BaseModel):
+    """Batch update request."""
+    ids: list[int]
+    status: str
 
 
 @router.get("/logs", response_model=AuditLogPage)
@@ -34,10 +59,8 @@ def list_audit_logs(
     db: DBSession = Depends(get_db),
 ):
     """Query audit logs with filters and pagination."""
-    # Security: whitelist sort_by to prevent column enumeration
     ALLOWED_SORT_COLUMNS = {"timestamp", "severity", "user_id", "rule_id", "action", "direction", "status"}
     if sort_by not in ALLOWED_SORT_COLUMNS:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail=f"Invalid sort field: {sort_by}")
 
     return audit_service.query_logs(
@@ -54,6 +77,22 @@ def list_audit_logs(
         sort_by=sort_by,
         sort_order=sort_order,
     )
+
+
+@router.patch("/logs/{log_id}")
+def update_audit_log(log_id: int, update: AuditLogUpdate, db: DBSession = Depends(get_db)):
+    """Update an audit log entry (mark as resolved / false positive)."""
+    log = audit_service.update_log(db, log_id, status=update.status)
+    if log is None:
+        raise HTTPException(status_code=404, detail=f"Audit log not found: {log_id}")
+    return log
+
+
+@router.post("/logs/batch-update")
+def batch_update_audit_logs(req: BatchUpdateRequest, db: DBSession = Depends(get_db)):
+    """Batch update audit log entries."""
+    count = audit_service.batch_update_logs(db, req.ids, status=req.status)
+    return {"updated": count}
 
 
 @router.get("/report", response_model=ComplianceReportResponse)

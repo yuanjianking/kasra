@@ -82,67 +82,61 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
     logger.info("Database initialized.")
 
-    # 1b. Auto-seed sample data for development
+    # 1b. Run migrations (adds columns to existing tables + seeds master data)
     try:
-        from app.database import SessionLocal
-        from app.models.audit_log import AuditLog
-        from app.models.user import User
-        from app.models.rule_config import RuleConfig
-        from app.models.user_behavior import UserBehavior
-        from app.models.audit_chain import AuditChain
-
-        db = SessionLocal()
-        if db.query(AuditLog).count() == 0:
-            logger.info("Seeding development data...")
-
-            # Users
-            if not db.query(User).filter(User.username == "admin").first():
-                db.add(User(username="admin", role="admin", is_active=True))
-            if not db.query(User).filter(User.username == "demo-user").first():
-                db.add(User(username="demo-user", role="user", is_active=True))
-
-            # SDK rules snapshot
-            sdk_rules = [
-                ("I-01","GitHub Token","credential_leak","P0","block"),
-                ("I-02","OpenAI API Key","credential_leak","P0","block"),
-                ("I-03","Anthropic API Key","credential_leak","P0","block"),
-                ("I-04","AWS Access Key","credential_leak","P0","block"),
-                ("I-05","Generic Password/Secret","credential_leak","P0","block"),
-                ("I-06","Private Key/PEM Certificate","credential_leak","P0","block"),
-                ("I-08","China Phone Number","pii","P1","redact"),
-                ("I-09","China National ID","pii","P1","redact"),
-                ("I-10","Email Address","pii","P1","redact"),
-                ("I-11","Prompt Injection Attack","injection","P0","block"),
-                ("I-12","Jailbreak/Role-Play Attack","injection","P0","block"),
-                ("O-01","Dangerous Function Call","code_security","P0","warn"),
-                ("O-02","Dangerous Shell Command","code_security","P0","block"),
-                ("SEC-05","SQL Injection","code_security","P0","warn"),
-                ("SEC-12","XSS Risk","code_security","P0","warn"),
-                ("IAC-01","Dockerfile Security","iac","P1","warn"),
-                ("IAC-02","K8s Security Config","iac","P1","warn"),
-            ]
-            for rid, nm, cat, sev, act in sdk_rules:
-                if not db.query(RuleConfig).filter(RuleConfig.id == rid).first():
-                    db.add(RuleConfig(id=rid, name=nm, category=cat, severity=sev, action=act, enabled=True, is_custom=False, source="sdk"))
-
-            # Sample audit logs
-            from datetime import datetime, timedelta
-            now = datetime.utcnow()
-            sample_logs = [
-                AuditLog(timestamp=now-timedelta(hours=2),user_id="demo-user",session_id="sess_001",rule_id="I-05",rule_name="Generic Password/Secret",severity="P0",action="block",direction="input",matched_text="password=admin123",match_count=1,status="resolved"),
-                AuditLog(timestamp=now-timedelta(hours=1),user_id="demo-user",session_id="sess_002",rule_id="O-01",rule_name="Dangerous Function Call",severity="P0",action="warn",direction="output",matched_text="eval(request.body)",match_count=1,status="pending"),
-                AuditLog(timestamp=now-timedelta(minutes=30),user_id="demo-user",session_id="sess_003",rule_id="I-11",rule_name="Prompt Injection Attack",severity="P0",action="block",direction="input",matched_text="ignore all previous instructions",match_count=1,status="pending"),
-                AuditLog(timestamp=now-timedelta(minutes=15),user_id="admin",session_id="sess_004",rule_id="SEC-05",rule_name="SQL Injection",severity="P0",action="warn",direction="batch",matched_text='cursor.execute(f"SELECT * FROM users")',match_count=1,status="fp"),
-                AuditLog(timestamp=now-timedelta(minutes=5),user_id="demo-user",session_id="sess_001",rule_id="O-02",rule_name="Dangerous Shell Command",severity="P0",action="block",direction="output",matched_text='subprocess.call("rm -rf /", shell=True)',match_count=1,status="pending"),
-                AuditLog(timestamp=now,user_id="demo-user",session_id="sess_005",rule_id="I-06",rule_name="Generic Password/Secret",severity="P0",action="block",direction="input",matched_text="password=secret123",match_count=1,status="pending"),
-            ]
-            for log in sample_logs:
-                db.add(log)
-            db.commit()
-            logger.info("Development data seeded: users=%d, rules=%d, logs=%d", 2, len(sdk_rules), len(sample_logs))
-        db.close()
+        from app.db_migration import run_migrations
+        run_migrations()
+        logger.info("Migrations complete.")
     except Exception as exc:
-        logger.warning("Seed data skipped: %s", exc)
+        logger.warning("Migration step skipped: %s", exc)
+
+    # 1c. Seed SDK rules from DML into the rules table (SQLite dev)
+    try:
+        from app.db_migration import seed_sdk_rules_from_dml
+        seed_sdk_rules_from_dml()
+    except Exception as exc:
+        logger.warning("SDK rule seeding skipped: %s", exc)
+
+    # 1d. Auto-seed sample data for development (skip in test mode)
+    if os.environ.get("KASRA_APP_SEED_DATA", "true").lower() == "false":
+        logger.debug("Seed data disabled via KASRA_APP_SEED_DATA=false")
+    else:
+        try:
+            from app.database import SessionLocal
+            from app.models.audit_log import AuditLog
+            from app.models.user import User
+            from app.models.user_behavior import UserBehavior
+            from app.models.audit_chain import AuditChain
+            from app.models.rule_config import Rule
+
+            db = SessionLocal()
+            if db.query(AuditLog).count() == 0:
+                logger.info("Seeding development data...")
+
+                # Users
+                if not db.query(User).filter(User.username == "admin").first():
+                    db.add(User(username="admin", role="admin", is_active=True))
+                if not db.query(User).filter(User.username == "demo-user").first():
+                    db.add(User(username="demo-user", role="user", is_active=True))
+
+                # Sample audit logs
+                from datetime import datetime, timedelta
+                now = datetime.utcnow()
+                sample_logs = [
+                    AuditLog(timestamp=now-timedelta(hours=2),user_id="demo-user",session_id="sess_001",rule_id="I-05",rule_name="Generic Password/Secret",severity="P0",action="block",direction="input",matched_text="password=admin123",match_count=1,status="resolved"),
+                    AuditLog(timestamp=now-timedelta(hours=1),user_id="demo-user",session_id="sess_002",rule_id="O-01",rule_name="Dangerous Function Call",severity="P0",action="warn",direction="output",matched_text="eval(request.body)",match_count=1,status="pending"),
+                    AuditLog(timestamp=now-timedelta(minutes=30),user_id="demo-user",session_id="sess_003",rule_id="I-11",rule_name="Prompt Injection Attack",severity="P0",action="block",direction="input",matched_text="ignore all previous instructions",match_count=1,status="pending"),
+                    AuditLog(timestamp=now-timedelta(minutes=15),user_id="admin",session_id="sess_004",rule_id="SEC-05",rule_name="SQL Injection",severity="P0",action="warn",direction="batch",matched_text='cursor.execute(f"SELECT * FROM users")',match_count=1,status="fp"),
+                    AuditLog(timestamp=now-timedelta(minutes=5),user_id="demo-user",session_id="sess_001",rule_id="O-02",rule_name="Dangerous Shell Command",severity="P0",action="block",direction="output",matched_text='subprocess.call("rm -rf /", shell=True)',match_count=1,status="pending"),
+                    AuditLog(timestamp=now,user_id="demo-user",session_id="sess_005",rule_id="I-06",rule_name="Generic Password/Secret",severity="P0",action="block",direction="input",matched_text="password=secret123",match_count=1,status="pending"),
+                ]
+                for log in sample_logs:
+                    db.add(log)
+                db.commit()
+                logger.info("Development data seeded: users=%d, logs=%d", 2, len(sample_logs))
+            db.close()
+        except Exception as exc:
+            logger.warning("Seed data skipped: %s", exc)
 
     # 2. Start TCP CONNECT proxy (optional — opt-in via config)
     connect_proxy = None
@@ -165,25 +159,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
             connect_proxy = None
 
-    # 3. Initialize SDK RuleEngine
+    # 3. Initialize SDK RuleEngine + load rules from DB
     logger.info("Initializing Kasra SDK RuleEngine...")
     engine_service.initialize()
-    logger.info(
-        "RuleEngine initialized with %d rules.",
-        engine_service.engine.rule_count,
-    )
+    logger.info("RuleEngine created, loading rules from database...")
 
-    # 3b. Sync disabled rule states from database to in-memory engine
-    #     so that rules disabled via the frontend persist across restarts.
     try:
         from app.database import SessionLocal
-        from app.services.rules_service import sync_disabled_rules_from_db, sync_custom_rules_from_db
-        sync_db = SessionLocal()
-        sync_disabled_rules_from_db(sync_db)
-        sync_custom_rules_from_db(sync_db)
-        sync_db.close()
+        load_db = SessionLocal()
+        count = engine_service.reload_rules_from_db(load_db)
+        load_db.close()
+        logger.info("RuleEngine loaded %d rules from database.", count)
     except Exception:
-        logger.exception("Failed to sync disabled rules from DB")
+        logger.exception("Failed to load rules from DB into engine")
 
     # Initialize Prometheus metrics
     if engine_service.is_initialized:

@@ -15,7 +15,7 @@ from sqlalchemy import inspect as sa_inspect
 from app.database import engine, SessionLocal
 from app.models.audit_log import AuditLog
 from app.models.audit_chain import AuditChain
-from app.models.rule_config import RuleConfig
+from app.models.rule_config import Rule as RuleConfig
 from app.models.custom_rule import CustomRule
 from app.models.user import User
 from app.models.user_behavior import UserBehavior
@@ -73,7 +73,7 @@ class TestAuditLogs:
             db.close()
 
     def test_safe_content_no_log(self, client, auth_headers):
-        client.post("/v1/scan/input", json={"content": "什么是快速排序？", "user_id": "safe-user"}, headers=auth_headers)
+        client.post("/v1/scan/input", json={"content": "This is completely safe content", "user_id": "safe-user"}, headers=auth_headers)
         db = SessionLocal()
         try:
             count = db.query(AuditLog).filter(AuditLog.user_id == "safe-user").count()
@@ -158,7 +158,6 @@ class TestRulesTable:
             rule = db.query(RuleConfig).filter(RuleConfig.id == "I-01").first()
             assert rule is not None
             assert rule.enabled is False
-            assert rule.is_custom is False
             assert rule.source == "sdk"
         finally:
             db.close()

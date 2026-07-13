@@ -56,9 +56,19 @@ kasra_server = FastMCP(
 
 
 def _ensure_engine() -> None:
-    """Ensure the RuleEngine is initialized."""
-    if not engine_service.is_initialized:
-        engine_service.initialize()
+    """Ensure the RuleEngine is initialized with rules from DB."""
+    if engine_service.is_initialized:
+        return
+    engine_service.initialize()
+    # Load rules from database
+    try:
+        from app.database import SessionLocal
+        db = SessionLocal()
+        engine_service.reload_rules_from_db(db)
+        db.close()
+    except Exception:
+        import logging
+        logging.getLogger("kasra.mcp").exception("Failed to load rules from DB")
 
 
 # ===========================================================================

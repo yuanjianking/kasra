@@ -28,7 +28,7 @@ dependencies = [
     "orjson>=3.9",
     "mcp>=1.0",
     "prometheus-client>=0.20",
-    "kasra-sdk @ git+https://github.com/yuanjianking/kasra-sdk.git",
+    "kasra-sdk @ /home/ubuntu/dev/kasra-sdk",
 ]
 
 [project.optional-dependencies]

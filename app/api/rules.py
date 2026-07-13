@@ -1,8 +1,9 @@
-"""Rule management API endpoints."""
+"""Rule management API endpoints — CRUD + import/export."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session as DBSession
 
 from app.database import get_db
@@ -34,6 +35,45 @@ def list_rules(
         page=page,
         page_size=page_size,
     )
+
+
+@router.get("/export")
+def export_rules(
+    series: str | None = Query(default=None, description="Filter by bundle series: I, O, SEC, IAC"),
+    category: str | None = Query(default=None, description="Filter by category name"),
+    db: DBSession = Depends(get_db),
+):
+    """Export rules as a JSON bundle."""
+    bundle = rules_service.export_rules_to_bundle(
+        db,
+        series=series,
+        category=category,
+    )
+    return JSONResponse(
+        content=bundle,
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=kasra-rules-export.json"},
+    )
+
+
+@router.post("/import", status_code=201)
+async def import_rules(
+    file: UploadFile,
+    db: DBSession = Depends(get_db),
+):
+    """Import rules from an uploaded JSON bundle file."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    if not file.filename.endswith(".json"):
+        raise HTTPException(status_code=400, detail="Only .json files are supported")
+
+    try:
+        stats = await rules_service.import_rules_from_file(db, file)
+        return stats
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Import failed: {e}")
 
 
 @router.get("/{rule_id}", response_model=RuleSchema)
