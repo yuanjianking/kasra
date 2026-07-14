@@ -68,7 +68,7 @@ class TestScanInput:
         """OpenAI API key should be detected."""
         response = client.post(
             "/v1/scan/input",
-            json={"content": "OPENAI_API_KEY=sk-proj-ABCDEF1234567890abcdef123456"},
+            json={"content": "OPENAI_API_KEY=sk-proj-ABCDEFGHIJ0123456789T3BlbkFJABCDEFGHIJ0123456789"},
             headers=auth_headers,
         )
         assert response.status_code == 200

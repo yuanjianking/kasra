@@ -208,6 +208,16 @@ CREATE INDEX IF NOT EXISTS idx_audit_chain_last_log ON audit_chain (last_log_id)
 CREATE INDEX IF NOT EXISTS idx_audit_chain_created  ON audit_chain (created_at DESC);
 
 
+-- ── Schema metadata table (migration version tracking) ──────────────────────
+CREATE TABLE IF NOT EXISTS meta (
+    key             VARCHAR(64) PRIMARY KEY,
+    value           TEXT
+);
+
+INSERT INTO meta (key, value) VALUES ('schema_version', '2')
+ON CONFLICT (key) DO NOTHING;
+
+
 -- ── Database-level constraints ───────────────────────────────────────────────
 -- Ensure timestamps are reasonable
 ALTER TABLE audit_logs ADD CONSTRAINT chk_audit_timestamp

@@ -52,7 +52,17 @@ ALTER TABLE rules DROP COLUMN IF EXISTS metadata;
 -- (safe to run, column may not exist)
 ALTER TABLE custom_rules DROP COLUMN IF EXISTS category;
 
--- ── 7. Seed master data ──
+-- ── 7. Add schema version tracking table ──
+CREATE TABLE IF NOT EXISTS meta (
+    key     VARCHAR(64) PRIMARY KEY,
+    value   TEXT
+);
+
+INSERT INTO meta (key, value) VALUES ('schema_version', '2')
+ON CONFLICT (key) DO NOTHING;
+
+
+-- ── 8. Seed master data ──
 INSERT INTO categories (name, label, description, color)
 SELECT * FROM (VALUES
     ('I', 'Input Detection', 'Rules that detect security issues in user input', '#ef4444'),

@@ -197,8 +197,8 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={summary.top_triggered_rules.slice(0, 8)} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                    <YAxis dataKey="rule_id" type="category" width={60} tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                    <XAxis type="number" domain={[0, 'dataMax']} ticks={(() => { const m = Math.max(...summary.top_triggered_rules.slice(0, 8).map(r => r.count), 1); return Array.from({length: m + 1}, (_, i) => i); })()} tick={{ fontSize: 11 }} stroke="#94a3b8" />
+                    <YAxis dataKey="rule_id" type="category" width={80} tick={{ fontSize: 11 }} stroke="#94a3b8" />
                     <Tooltip
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
                     />

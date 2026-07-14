@@ -29,7 +29,10 @@ from app.database import Base  # noqa: E402
 # Import all model modules so they register on Base.metadata
 from app.models.audit_log import AuditLog  # noqa: F401, E402
 from app.models.audit_chain import AuditChain  # noqa: F401, E402
-from app.models.rule_config import RuleConfig  # noqa: F401, E402
+from app.models.rule_config import Rule  # noqa: F401, E402
+from app.models.category import Category  # noqa: F401, E402
+from app.models.pattern_type import PatternType  # noqa: F401, E402
+from app.models.custom_rule import CustomRule  # noqa: F401, E402
 from app.models.user_behavior import UserBehavior  # noqa: F401, E402
 from app.models.user import User  # noqa: F401, E402
 

@@ -280,6 +280,8 @@ export interface HealthDetail {
   database: { status: string; type: string; version: string; error: string | null };
   https_proxy: { enabled: boolean; port: number };
   rules_loaded: number;
+  rules_total: number;
+  cr_rules_loaded: number;
   audit_enabled: boolean;
 }
 

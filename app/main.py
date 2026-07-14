@@ -133,7 +133,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 for log in sample_logs:
                     db.add(log)
                 db.commit()
-                logger.info("Development data seeded: users=%d, logs=%d", 2, len(sample_logs))
+
+                # Sample user behavior (matching audit logs above)
+                from app.models.user_behavior import UserBehavior
+                if db.query(UserBehavior).count() == 0:
+                    today = now.date()
+                    demo_triggers = {}
+                    for log in sample_logs:
+                        if log.user_id == "demo-user":
+                            rid = log.rule_id
+                            demo_triggers[rid] = demo_triggers.get(rid, 0) + 1
+                    db.add(UserBehavior(
+                        user_id="demo-user", date=today,
+                        total_requests=5, blocked_requests=3, warned_requests=1,
+                        first_request=now.time(), last_request=now.time(),
+                        rule_triggers=demo_triggers,
+                    ))
+                    db.add(UserBehavior(
+                        user_id="admin", date=today,
+                        total_requests=1, blocked_requests=0, warned_requests=1,
+                        first_request=now.time(), last_request=now.time(),
+                        rule_triggers={"SEC-05": 1},
+                    ))
+                    db.commit()
+                logger.info("Development data seeded: users=%d, logs=%d, behaviors=%d", 2, len(sample_logs), 2)
             db.close()
         except Exception as exc:
             logger.warning("Seed data skipped: %s", exc)

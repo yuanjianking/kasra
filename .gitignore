@@ -1,45 +1,35 @@
-# Python
+# ── Python ──
 __pycache__/
 *.py[cod]
 *.egg-info/
-*.egg
+.env
 .venv/
 venv/
 
-# Data files (SQLite databases + audit logs)
+# ── Node / Frontend ──
+frontend/node_modules/
+frontend/dist/
+
+# ── Database ──
 data/
 *.db
 *.db-shm
 *.db-wal
-*.db-journal
-kasra-audit.jsonl
+*.sqlite*
 
-# Test artifacts
-test_*.db
-test_*.db-shm
-test_*.db-wal
-.pytest_cache/
-
-# IDE
-.vscode/
+# ── IDE / Editors ──
 .idea/
+.vscode/
 *.swp
 *.swo
+*~
 
-# OS
+# ── OS ──
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
+# ── Logs / Dumps ──
+*.log
+*.out
+*.dump
 
-# Frontend
-frontend/node_modules/
-frontend/dist/
-
-# Build artifacts
-*.so
-*.dylib
-
-docs/

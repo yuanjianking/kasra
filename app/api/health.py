@@ -20,8 +20,24 @@ def health_check():
     engine_info = {}
     if engine_ok:
         engine = engine_service.engine
+        cr_rule_ids = set()
+        try:
+            cr_rule_ids = engine.disabled_code_review_rule_ids
+            cr_rule_ids |= {r.get("id") for r in engine.get_code_review_rules() if r.get("id")}
+        except Exception:
+            pass
+        cr_count = len(cr_rule_ids) if cr_rule_ids else 0
+        if cr_count == 0:
+            # fallback: try to count from scanner
+            try:
+                scanner = engine._get_code_review_scanner()
+                cr_count = len(scanner.rules) + len(scanner._custom_rules)
+            except Exception:
+                pass
         engine_info = {
             "rules_loaded": engine.rule_count,
+            "cr_rules_loaded": cr_count,
+            "rules_total": engine.rule_count + cr_count,
             "audit_enabled": engine.config.audit.enabled,
         }
 

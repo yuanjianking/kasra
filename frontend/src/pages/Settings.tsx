@@ -5,13 +5,17 @@ import { ChartSkeleton, EmptyState } from '../components'
 
 export default function Settings() {
   const [health, setHealth] = useState<HealthDetail | null>(null)
+  const [totalRules, setTotalRules] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [apiKey] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('kasra_api_key') || '' : '')
 
   useEffect(() => {
-    getHealthDetail()
-      .then(setHealth)
+    Promise.all([
+      getHealthDetail(),
+      fetch('/v1/rules?page_size=1', { headers: { 'X-API-Key': typeof window !== 'undefined' ? localStorage.getItem('kasra_api_key') || '' : '' } }).then(r => r.json()).then(d => d.total).catch(() => 0),
+    ])
+      .then(([h, total]) => { setHealth(h); setTotalRules(total) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -99,8 +103,9 @@ export default function Settings() {
         {/* Rules */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">🛡️ Rules</h3>
-          <div className="text-3xl font-bold text-slate-800">{health?.rules_loaded || 0}</div>
-          <div className="text-xs text-slate-400 mt-1">Rules loaded</div>
+          <div className="text-3xl font-bold text-slate-800">{health?.rules_total || totalRules || 0}</div>
+          <div className="text-xs text-slate-400 mt-1">Total rules loaded</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">{health?.rules_loaded || 0} I/O detection + {health?.cr_rules_loaded || 0} code review</div>
         </div>
 
         {/* Audit */}
