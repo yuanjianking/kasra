@@ -298,8 +298,50 @@ def seed_sdk_rules_from_dml() -> None:
         db.close()
 
 
+SCHEMA_VERSION = 2
+
+
+def _get_schema_version(db: SessionLocal) -> int:
+    """Get the current schema version from the DB, or 0 if not set."""
+    try:
+        result = db.execute(text("SELECT value FROM meta WHERE key = 'schema_version'")).scalar()
+        return int(result) if result else 0
+    except Exception:
+        return 0
+
+
+def _set_schema_version(db: SessionLocal, version: int) -> None:
+    """Set the schema version."""
+    try:
+        db.execute(text("CREATE TABLE IF NOT EXISTS meta (key VARCHAR(64) PRIMARY KEY, value TEXT)"))
+        db.execute(
+            text("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', :v)"),
+            {"v": str(version)},
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
 def run_migrations() -> None:
-    """Run all pending schema upgrades and seed master data."""
-    _upgrade_to_v2(engine)
-    seed_master_data()
-    logger.info("Migrations complete.")
+    """Run all pending schema upgrades and seed master data.
+
+    Checks ``meta.schema_version`` to avoid re-running migrations.
+    Safe to call on every startup.
+    """
+    db = SessionLocal()
+    try:
+        current_version = _get_schema_version(db)
+        db.close()
+
+        if current_version < 2:
+            _upgrade_to_v2(engine)
+            seed_master_data()
+
+        db2 = SessionLocal()
+        _set_schema_version(db2, SCHEMA_VERSION)
+        db2.close()
+        logger.info("Schema at version %d.", SCHEMA_VERSION)
+    except Exception:
+        logger.exception("Migration failed")
+        raise

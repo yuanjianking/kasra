@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import type { AuditLogEntry } from '../api/client'
 import { getAuditLogs, updateAuditLogStatus } from '../api/client'
 import { Badge, SlideOver, TableSkeleton, EmptyState, Pagination, useToast } from '../components'
@@ -89,23 +89,38 @@ export default function AuditLogs() {
           <h2 className="text-2xl font-bold text-slate-800">Audit Logs</h2>
           <p className="text-sm text-slate-400 mt-0.5">Review detection events and mark as false positive / resolved</p>
         </div>
-        {selectedIds.size > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-500">{selectedIds.size} selected</span>
-            {STATUS_ACTIONS.map(a => (
-              <button
-                key={a.value}
-                onClick={() => {
-                  selectedIds.forEach(id => handleStatusChange(id, a.value))
-                  setSelectedIds(new Set())
-                }}
-                className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${a.color}`}
-              >
-                {a.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {total > 0 && (
+            <button
+              onClick={() => {
+                const qs = new URLSearchParams({ format: 'csv' });
+                if (dateFrom) qs.set('start_time', dateFrom);
+                if (dateTo) qs.set('end_time', dateTo);
+                window.open(`/v1/audit/export?${qs}`, '_blank');
+              }}
+              className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50 flex items-center gap-1.5"
+            >
+              <span>📥</span><span>Export CSV</span>
+            </button>
+          )}
+          {selectedIds.size > 0 && (
+            <React.Fragment>
+              <span className="text-sm text-slate-500">{selectedIds.size} selected</span>
+              {STATUS_ACTIONS.map(a => (
+                <button
+                  key={a.value}
+                  onClick={() => {
+                    selectedIds.forEach(id => handleStatusChange(id, a.value))
+                    setSelectedIds(new Set())
+                  }}
+                  className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${a.color}`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </React.Fragment>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

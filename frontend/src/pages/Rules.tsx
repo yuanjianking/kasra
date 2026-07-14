@@ -34,6 +34,49 @@ export default function Rules() {
   })
   const [creating, setCreating] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<RuleItem | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedRuleIds, setSelectedRuleIds] = useState<Set<string>>(new Set())
+  const [showTestModal, setShowTestModal] = useState(false)
+  const [testContent, setTestContent] = useState('')
+  const [testResult, setTestResult] = useState<{ blocked: boolean; triggered_rules: { rule_id: string; matched_text: string | null }[] } | null>(null)
+  const [testing, setTesting] = useState(false)
+
+  // ── Rule Test ──
+  const handleTestRule = async () => {
+    if (!testContent.trim()) { toast('Enter content to test', 'warning'); return }
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const apiKey = localStorage.getItem('kasra_api_key')
+      const res = await fetch('/v1/scan/input', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey || '' },
+        body: JSON.stringify({ content: testContent }),
+      })
+      const data = await res.json()
+      setTestResult({ blocked: data.blocked, triggered_rules: data.triggered_rules })
+    } catch (e: any) { toast('Test failed: ' + e.message, 'error') }
+    setTesting(false)
+  }
+
+  // ── Batch operations ──
+  const toggleSelectAll = () => {
+    if (selectedRuleIds.size === rules.length) { setSelectedRuleIds(new Set()); return }
+    setSelectedRuleIds(new Set(rules.map(r => r.id)))
+  }
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedRuleIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelectedRuleIds(next)
+  }
+  const handleBatchToggle = async (enabled: boolean) => {
+    for (const id of selectedRuleIds) {
+      try { await updateRule(id, { enabled }) } catch { /* skip */ }
+    }
+    toast(`${enabled ? 'Enabled' : 'Disabled'} ${selectedRuleIds.size} rules`, 'success')
+    setSelectedRuleIds(new Set())
+    fetchRules()
+  }
 
   // ── Import / Export ──
   const [showImport, setShowImport] = useState(false)
@@ -171,6 +214,10 @@ export default function Rules() {
             className="px-4 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-1.5">
             <span>📤</span><span>Export</span>
           </button>
+          <button onClick={() => { setTestContent(''); setTestResult(null); setShowTestModal(true) }}
+            className="px-4 py-1.5 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-1.5">
+            <span>🧪</span><span>Test Rule</span>
+          </button>
           <button onClick={() => setShowCreate(true)}
             className="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-1.5">
             <span>+</span><span>Create Rule</span>
@@ -211,6 +258,9 @@ export default function Rules() {
 
       {/* Filters bar */}
       <div className="flex items-center gap-3 mb-4">
+        <input type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setPage(1) }}
+          placeholder="Search by name or ID..."
+          className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <select value={severity} onChange={(e) => { setSeverity(e.target.value); setPage(1) }}
           className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
           <option value="">All Severities</option>
@@ -220,6 +270,16 @@ export default function Rules() {
         </select>
         <span className="text-sm text-slate-400 ml-auto">{total} rules</span>
       </div>
+
+      {/* Batch action bar */}
+      {selectedRuleIds.size > 0 && (
+        <div className="mb-3 flex items-center gap-3 px-4 py-2 bg-indigo-50 rounded-xl border border-indigo-200">
+          <span className="text-sm font-medium text-indigo-700">{selectedRuleIds.size} selected</span>
+          <button onClick={() => handleBatchToggle(true)} className="px-3 py-1 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">Enable all</button>
+          <button onClick={() => handleBatchToggle(false)} className="px-3 py-1 text-xs bg-slate-600 text-white rounded-lg hover:bg-slate-700">Disable all</button>
+          <button onClick={() => setSelectedRuleIds(new Set())} className="px-3 py-1 text-xs border border-slate-300 rounded-lg hover:bg-slate-50">Clear</button>
+        </div>
+      )}
 
       {/* Error */}
       {error && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200 text-sm">{error}</div>}
@@ -235,7 +295,11 @@ export default function Rules() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-500">
-                <th className="p-3 pl-5 font-medium text-xs uppercase tracking-wider w-24">ID</th>
+                <th className="p-3 pl-3 w-8">
+                  <input type="checkbox" checked={selectedRuleIds.size === rules.length && rules.length > 0}
+                    onChange={toggleSelectAll} className="rounded border-slate-300" />
+                </th>
+                <th className="p-3 pl-1 font-medium text-xs uppercase tracking-wider w-24">ID</th>
                 <th className="p-3 font-medium text-xs uppercase tracking-wider">Name</th>
                 <th className="p-3 font-medium text-xs uppercase tracking-wider">Severity</th>
                 <th className="p-3 font-medium text-xs uppercase tracking-wider">Action</th>
@@ -250,7 +314,11 @@ export default function Rules() {
                   className={`border-b border-slate-100 hover:bg-indigo-50/30 transition-colors ${
                     rule.is_custom ? 'bg-purple-50/40' : ''
                   }`}>
-                  <td className="p-3 pl-5">
+                  <td className="p-3 pl-3">
+                    <input type="checkbox" checked={selectedRuleIds.has(rule.id)}
+                      onChange={() => toggleSelect(rule.id)} className="rounded border-slate-300" />
+                  </td>
+                  <td className="p-3 pl-1">
                     <button onClick={() => setSelectedRule(rule)}
                       className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline">
                       {rule.id}
@@ -489,6 +557,42 @@ export default function Rules() {
                   <span>📤</span><span>Download Bundle</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Test Rule Modal ── */}
+      {showTestModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center" onClick={() => setShowTestModal(false)}>
+          <div className="fixed inset-0 bg-black/40" />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4 z-10" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-slate-800">🧪 Test Rules</h3>
+              <button onClick={() => setShowTestModal(false)} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400">&times;</button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">Enter text content to test which rules trigger:</p>
+              <textarea value={testContent} onChange={e => setTestContent(e.target.value)}
+                rows={5} placeholder="Type or paste content to scan..."
+                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono" />
+              <button onClick={handleTestRule} disabled={testing}
+                className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                {testing ? 'Scanning...' : 'Run Test'}
+              </button>
+              {testResult && (
+                <div className={`p-4 rounded-xl border ${testResult.blocked ? 'bg-red-50 border-red-200' : testResult.triggered_rules.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                  <p className="text-sm font-medium mb-2">
+                    {testResult.blocked ? '🚫 Blocked' : testResult.triggered_rules.length > 0 ? `⚠ ${testResult.triggered_rules.length} rule(s) triggered` : '✅ No rules triggered'}
+                  </p>
+                  {testResult.triggered_rules.map((tr, i) => (
+                    <div key={i} className="text-xs text-slate-700 mb-1 flex gap-2">
+                      <span className="font-mono font-medium text-indigo-600">{tr.rule_id}</span>
+                      {tr.matched_text && <span className="text-slate-400 truncate">"{tr.matched_text}"</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
