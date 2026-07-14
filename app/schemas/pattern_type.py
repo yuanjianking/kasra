@@ -10,7 +10,7 @@ class PatternTypeSchema(BaseModel):
 
     id: int = Field(..., description="Pattern type ID")
     name: str = Field(..., description="Type name: regex, keyword, yaml_path, ...")
-    label: str = Field(..., description="Display label, e.g. 正则匹配")
+    label: str = Field(..., description="Display label, e.g. Regex Match")
     description: str | None = Field(default=None)
 
     model_config = {"from_attributes": True}

@@ -112,28 +112,23 @@ class EngineService:
 
         rules_defs: list[RuleDefinition] = []
 
-        # 1. Load built-in SDK rules
-        sdk_rules = db_session.query(RuleModel).filter(
-            RuleModel.enabled == True  # noqa: E712
-        ).all()
+        # 1. Load built-in SDK rules (all — enabled state will be synced after)
+        sdk_rules = db_session.query(RuleModel).all()
         for r in sdk_rules:
             rule_def = _rule_model_to_definition(r)
             if rule_def is not None:
                 rules_defs.append(rule_def)
 
-        # 2. Load custom rules
-        custom_rules = db_session.query(CustomRule).filter(
-            CustomRule.enabled == True  # noqa: E712
-        ).all()
+        # 2. Load custom rules (all — enabled state will be synced after)
+        custom_rules = db_session.query(CustomRule).all()
         for cr in custom_rules:
             rule_def = _custom_rule_to_definition(cr)
             if rule_def is not None:
                 rules_defs.append(rule_def)
 
-        # 3. Inject code review rules into scanner
+        # 3. Inject code review rules into scanner (all — state synced after)
         cr_rules = db_session.query(RuleModel).filter(
             RuleModel.rule_type == "code_review",
-            RuleModel.enabled == True,  # noqa: E712
         ).all()
         cr_rule_dicts = []
         for r in cr_rules:
@@ -146,7 +141,6 @@ class EngineService:
         # Also inject custom CR rules
         custom_cr_rules = db_session.query(CustomRule).filter(
             CustomRule.rule_type == "code_review",
-            CustomRule.enabled == True,  # noqa: E712
         ).all()
         for cr in custom_cr_rules:
             try:
@@ -165,6 +159,36 @@ class EngineService:
             "Loaded %d rules from DB into engine (%d SDK + %d custom).",
             count, len(sdk_rules), len(custom_rules),
         )
+
+        # 5. Sync disabled states from DB to engine
+        disabled = db_session.query(RuleModel).filter(
+            RuleModel.enabled == False  # noqa: E712
+        ).all()
+        for r in disabled:
+            try:
+                if r.rule_type == "code_review":
+                    self._engine.disable_code_review_rule(r.id)
+                else:
+                    self._engine.disable_rule(r.id)
+            except (KeyError, ValueError):
+                pass
+
+        # Also sync disabled custom rules
+        disabled_cr = db_session.query(CustomRule).filter(
+            CustomRule.enabled == False  # noqa: E712
+        ).all()
+        for cr in disabled_cr:
+            try:
+                if cr.rule_type == "code_review":
+                    self._engine.remove_custom_cr_rule(cr.id)
+                else:
+                    self._engine.disable_rule(cr.id)
+            except (KeyError, ValueError):
+                pass
+
+        if disabled or disabled_cr:
+            logger.info("Synced %d disabled rules state to engine.", len(disabled) + len(disabled_cr))
+
         return count
 
     def shutdown(self) -> None:

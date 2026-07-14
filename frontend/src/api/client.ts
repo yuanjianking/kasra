@@ -234,6 +234,39 @@ export async function createRule(data: {
   });
 }
 
+export interface ImportStats {
+  total: number;
+  created: number;
+  updated: number;
+  errors: string[];
+}
+
+export async function exportRules(series?: string, category?: string, source: string = 'sdk') {
+  const qs = new URLSearchParams();
+  if (series) qs.set('series', series);
+  if (category) qs.set('category', category);
+  qs.set('source', source);
+  const apiKey = typeof window !== 'undefined' ? localStorage.getItem('kasra_api_key') : null;
+  const res = await fetch(`/v1/rules/export?${qs}`, {
+    headers: { 'X-API-Key': apiKey || '' },
+  });
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  return res.blob();
+}
+
+export async function importRules(file: File, target: string = 'sdk') {
+  const apiKey = typeof window !== 'undefined' ? localStorage.getItem('kasra_api_key') : null;
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`/v1/rules/import?target=${target}`, {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey || '' },
+    body: formData,
+  });
+  if (!res.ok) throw new Error(`Import failed: ${await res.text()}`);
+  return res.json() as Promise<ImportStats>;
+}
+
 export async function deleteRule(ruleId: string): Promise<void> {
   await fetch(`/v1/rules/${ruleId}`, {
     method: 'DELETE',

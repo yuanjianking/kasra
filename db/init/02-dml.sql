@@ -19,12 +19,12 @@ WHERE NOT EXISTS (SELECT 1 FROM categories WHERE categories.name = v.name);
 -- ── 0b. Seed master data: pattern types ─────────────────────────────────────
 INSERT INTO pattern_types (name, label, description)
 SELECT * FROM (VALUES
-    ('regex',      '正则匹配',      'Regular expression pattern matching'),
-    ('keyword',    '关键词匹配',    'Exact keyword or substring matching'),
-    ('dictionary', '字典匹配',      'Dictionary/list-based matching'),
-    ('yaml_path',  'YAML 路径匹配', 'YAML key path with value regex'),
-    ('dockerfile', 'Dockerfile 指令匹配', 'Dockerfile instruction matching'),
-    ('keyvalue',   '键值对匹配',   'Key=value pair matching for .env files')
+    ('regex',       'Regex Match',      'Regular expression pattern matching'),
+    ('keyword',     'Keyword Match',    'Exact keyword or substring matching'),
+    ('dictionary', 'Dictionary Match',      'Dictionary/list-based matching'),
+    ('yaml_path',  'YAML Path Match', 'YAML key path with value regex'),
+    ('dockerfile', 'Dockerfile Match', 'Dockerfile instruction matching'),
+    ('keyvalue',   'Key-Value Match',   'Key=value pair matching for .env files')
 ) AS v(name, label, description)
 WHERE NOT EXISTS (SELECT 1 FROM pattern_types WHERE pattern_types.name = v.name);
 

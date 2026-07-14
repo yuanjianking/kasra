@@ -89,6 +89,12 @@ services:
     depends_on:
       - kasra-api
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null --max-time 3 http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     logging: *logging
 
   # ── MCP SSE server ──────────────────────────────────────────────────────
@@ -101,18 +107,35 @@ services:
     volumes:
       - ./config:/config:ro
     environment:
+      # Database (same as API — reads rules from DB)
+      - KASRA_APP_DATABASE_URL=postgresql+psycopg2://kasra:${POSTGRES_PASSWORD:?Must set POSTGRES_PASSWORD}@postgres:5432/kasra
+
+      # MCP Server
       - KASRA_MCP_PORT=8091
       - KASRA_MCP_HOST=0.0.0.0
+
+      # SDK Engine
       - KASRA_ENGINE__MAX_CONCURRENT_RULES=${KASRA_ENGINE_MAX_CONCURRENT:-50}
+      - KASRA_AUDIT__ENABLED=true
+
+      # Paths
+      - KASRA_APP_DATA_DIR=/data
+      - KASRA_APP_CONFIG_DIR=/config
       - KASRA_APP_LOG_LEVEL=${KASRA_LOG_LEVEL:-info}
-    command: python -m app.mcp_server
+
+      # Auth (needed for health endpoint)
+      - KASRA_APP_API_KEY=${KASRA_API_KEY:?Must set KASRA_API_KEY}
+      - KASRA_APP_JWT_SECRET=${KASRA_JWT_SECRET:?Must set KASRA_JWT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf -o /dev/null --max-time 3 http://localhost:8091/sse || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import socket;s=socket.socket();s.settimeout(3);s.connect(('localhost',8091));s.close();exit(0)\" || exit 1"]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     logging: *logging
 
   # ── PostgreSQL database ──────────────────────────────────────────────────

@@ -446,8 +446,15 @@ def _detection_config_from_bundle_rule(rule_dict: dict) -> dict:
 def import_rules_from_bundle(
     db: DBSession,
     bundle_data: dict[str, Any],
+    target: str = "sdk",  # "sdk" → rules table, "custom" → custom_rules table
 ) -> dict[str, Any]:
     """Import rules from a bundle JSON dict.
+
+    Args:
+        db: Database session.
+        bundle_data: Bundle JSON dict with ``bundle`` and ``rules`` keys.
+        target: ``"sdk"`` to import into ``rules`` table (built-in),
+                ``"custom"`` to import into ``custom_rules`` table.
 
     Returns import stats: total, created, updated, errors.
     """
@@ -473,7 +480,6 @@ def import_rules_from_bundle(
                 Category.name == cat_name
             ).first()
             if not cat:
-                # Try by label
                 cat = db.query(Category).filter(
                     Category.label == cat_name
                 ).first()
@@ -482,55 +488,125 @@ def import_rules_from_bundle(
 
         stages = rule_dict.get("applicable_stages", ["input"])
         rule_type = "code_review" if "batch" in stages else "io"
-
-        existing = db.query(RuleModel).filter(RuleModel.id == rule_id).first()
         detection_config = _detection_config_from_bundle_rule(rule_dict)
 
-        if existing:
-            existing.name = rule_dict.get("name", existing.name)
-            existing.description = rule_dict.get("description", existing.description)
-            existing.severity = rule_dict.get("severity", existing.severity)
-            existing.action = rule_dict.get("action", existing.action)
-            existing.category_id = category_id or existing.category_id
-            existing.rule_type = rule_type
-            existing.applicable_stages = stages
-            existing.detection_config = detection_config
-            existing.sdk_version = int(str(version).split(".")[0])
-            if "enabled" in rule_dict:
-                existing.enabled = rule_dict["enabled"]
-            stats["updated"] += 1
+        if target == "custom":
+            # ── Import into custom_rules table ──
+            existing_cr = db.query(CustomRule).filter(CustomRule.id == rule_id).first()
+            if existing_cr:
+                existing_cr.name = rule_dict.get("name", existing_cr.name)
+                existing_cr.description = rule_dict.get("description", existing_cr.description)
+                existing_cr.severity = rule_dict.get("severity", existing_cr.severity)
+                existing_cr.action = rule_dict.get("action", existing_cr.action)
+                existing_cr.category_id = category_id or existing_cr.category_id
+                existing_cr.rule_type = rule_type
+                existing_cr.applicable_stages = stages
+                existing_cr.detection_config = detection_config
+                if "enabled" in rule_dict:
+                    existing_cr.enabled = rule_dict["enabled"]
+                stats["updated"] += 1
+            else:
+                # Use first pattern as simplified fields
+                patterns = detection_config.get("patterns", [])
+                pt = patterns[0] if patterns else {}
+                pt_name = pt.get("type", "regex")
+                pt_obj = db.query(PatternType).filter(PatternType.name == pt_name).first()
+
+                new_cr = CustomRule(
+                    id=rule_id,
+                    name=rule_dict.get("name", rule_id),
+                    description=rule_dict.get("description"),
+                    severity=rule_dict.get("severity", "P2"),
+                    action=rule_dict.get("action", "warn"),
+                    category_id=category_id,
+                    rule_type=rule_type,
+                    applicable_stages=stages,
+                    pattern_type=pt_name,
+                    pattern_value=pt.get("value", ""),
+                    pattern_confidence=str(pt.get("confidence", 0.8)),
+                    pattern_type_id=pt_obj.id if pt_obj else None,
+                    detection_config=detection_config,
+                    enabled=rule_dict.get("enabled", True),
+                )
+                db.add(new_cr)
+                stats["created"] += 1
         else:
-            new_rule = RuleModel(
-                id=rule_id,
-                name=rule_dict.get("name", rule_id),
-                description=rule_dict.get("description"),
-                severity=rule_dict.get("severity", "P2"),
-                action=rule_dict.get("action", "warn"),
-                category_id=category_id,
-                rule_type=rule_type,
-                applicable_stages=stages,
-                detection_config=detection_config,
-                source="sdk",
-                bundle_series=series,
-                sdk_version=int(str(version).split(".")[0]),
-                enabled=rule_dict.get("enabled", True),
-            )
-            db.add(new_rule)
-            stats["created"] += 1
+            # ── Import into rules table (SDK built-in) ──
+            existing = db.query(RuleModel).filter(RuleModel.id == rule_id).first()
+
+            if existing:
+                existing.name = rule_dict.get("name", existing.name)
+                existing.description = rule_dict.get("description", existing.description)
+                existing.severity = rule_dict.get("severity", existing.severity)
+                existing.action = rule_dict.get("action", existing.action)
+                existing.category_id = category_id or existing.category_id
+                existing.rule_type = rule_type
+                existing.applicable_stages = stages
+                existing.detection_config = detection_config
+                existing.sdk_version = int(str(version).split(".")[0])
+                if "enabled" in rule_dict:
+                    existing.enabled = rule_dict["enabled"]
+                stats["updated"] += 1
+            else:
+                new_rule = RuleModel(
+                    id=rule_id,
+                    name=rule_dict.get("name", rule_id),
+                    description=rule_dict.get("description"),
+                    severity=rule_dict.get("severity", "P2"),
+                    action=rule_dict.get("action", "warn"),
+                    category_id=category_id,
+                    rule_type=rule_type,
+                    applicable_stages=stages,
+                    detection_config=detection_config,
+                    source="sdk",
+                    bundle_series=series,
+                    sdk_version=int(str(version).split(".")[0]),
+                    enabled=rule_dict.get("enabled", True),
+                )
+                db.add(new_rule)
+                stats["created"] += 1
 
     db.commit()
+
+    # ── Sync imported rules to live engine ──
+    try:
+        engine = engine_service.engine
+        if target == "custom":
+            # Sync each created/updated custom rule into engine
+            for rule_dict in rules_list:
+                cr = db.query(CustomRule).filter(CustomRule.id == rule_dict.get("id", "")).first()
+                if cr and cr.enabled:
+                    _sync_to_engine(cr)
+        else:
+            # Reload all rules from DB so new SDK rules take effect
+            from app.database import SessionLocal
+            reload_db = SessionLocal()
+            engine_service.reload_rules_from_db(reload_db)
+            reload_db.close()
+    except Exception as exc:
+        logger.warning("Engine sync after import failed: %s", exc)
+
     return stats
 
 
-async def import_rules_from_file(db: DBSession, file: UploadFile) -> dict[str, Any]:
-    """Import rules from an uploaded JSON file."""
+async def import_rules_from_file(db: DBSession, file: UploadFile, target: str = "sdk") -> dict[str, Any]:
+    """Import rules from an uploaded JSON file.
+
+    Args:
+        db: Database session.
+        file: Uploaded JSON file.
+        target: ``"sdk"`` for built-in rules table, ``"custom"`` for custom rules table.
+
+    Returns:
+        Import stats dict.
+    """
     content = await file.read()
     try:
         bundle_data = json.loads(content)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON: {e}") from e
 
-    return import_rules_from_bundle(db, bundle_data)
+    return import_rules_from_bundle(db, bundle_data, target=target)
 
 
 def export_rules_to_bundle(
@@ -538,6 +614,7 @@ def export_rules_to_bundle(
     *,
     series: str | None = None,
     category: str | None = None,
+    source: str = "sdk",  # "sdk" | "custom" | "all"
 ) -> dict[str, Any]:
     """Export rules as a bundle JSON dict.
 
@@ -545,51 +622,105 @@ def export_rules_to_bundle(
         db: Database session.
         series: Optional bundle series filter (I, O, SEC, IAC).
         category: Optional category name filter.
+        source: ``"sdk"`` for built-in rules, ``"custom"`` for custom rules,
+                ``"all"`` for both.
 
     Returns:
         A bundle dict compatible with the import format.
     """
-    query = db.query(RuleModel)
+    all_rules: list[dict[str, Any]] = []
+    effective_series = series or "ALL"
 
-    if series:
-        query = query.filter(RuleModel.bundle_series == series)
-    if category:
-        cat = db.query(Category).filter(Category.name == category).first()
-        if cat:
-            query = query.filter(RuleModel.category_id == cat.id)
+    # ── Source: sdk (rules table) ──
+    if source in ("sdk", "all"):
+        query = db.query(RuleModel)
+        if series:
+            query = query.filter(RuleModel.bundle_series == series)
+        if category:
+            cat = db.query(Category).filter(Category.name == category).first()
+            if cat:
+                query = query.filter(RuleModel.category_id == cat.id)
 
-    rules = query.all()
-    if not rules:
+        for r in query.all():
+            cat_name = _resolve_category_name(db, r.category_id)
+            all_rules.append({
+                "id": r.id,
+                "name": r.name,
+                "severity": r.severity,
+                "action": r.action,
+                "applicable_stages": list(_parse_json_col(r.applicable_stages, ["input"])),
+                "category": cat_name,
+                "detection": _parse_json_col(r.detection_config, {}),
+                "enabled": r.enabled,
+                "_source": "sdk",
+            })
+            if r.description:
+                all_rules[-1]["description"] = r.description
+
+    # ── Source: custom (custom_rules table) ──
+    if source in ("custom", "all"):
+        cq = db.query(CustomRule)
+        if category:
+            cat = db.query(Category).filter(Category.name == category).first()
+            if cat:
+                cq = cq.filter(CustomRule.category_id == cat.id)
+        for cr in cq.all():
+            cat_name = _resolve_category_name(db, cr.category_id)
+            stages = _parse_json_col(cr.applicable_stages, ["input"])
+            dc = cr.detection_config or {
+                "mode": "any",
+                "patterns": [{"type": cr.pattern_type, "value": cr.pattern_value, "confidence": float(cr.pattern_confidence or "0.8")}],
+            }
+            rule_dict = {
+                "id": cr.id,
+                "name": cr.name,
+                "severity": cr.severity,
+                "action": cr.action,
+                "applicable_stages": list(stages),
+                "category": cat_name,
+                "detection": dc,
+                "enabled": cr.enabled,
+                "_source": "custom",
+            }
+            if cr.description:
+                rule_dict["description"] = cr.description
+            if cr.target_files:
+                rule_dict["target_files"] = list(_parse_json_col(cr.target_files, []))
+            all_rules.append(rule_dict)
+
+    if not all_rules:
         return {"bundle": {"series": series or "ALL", "name": "Exported Rules", "version": "1", "total": 0}, "rules": []}
 
-    # Determine series
-    actual_series = series or (rules[0].bundle_series or "X")
-    name_map = {"I": "Input Detection Rules", "O": "Output Detection Rules", "SEC": "Code Security Rules", "IAC": "Infrastructure as Code Rules"}
+    # Determine series from first rule
+    first_series = series
+    if not first_series:
+        for r in all_rules:
+            if r["_source"] == "sdk":
+                if r["id"].startswith("I-"):
+                    first_series = "I"; break
+                elif r["id"].startswith("O-"):
+                    first_series = "O"; break
+                elif r["id"].startswith("SEC-"):
+                    first_series = "SEC"; break
+                elif r["id"].startswith("IAC-"):
+                    first_series = "IAC"; break
+        if not first_series:
+            first_series = "CUSTOM"
+
+    name_map = {"I": "Input Detection Rules", "O": "Output Detection Rules", "SEC": "Code Security Rules", "IAC": "Infrastructure as Code Rules", "CUSTOM": "Custom Rules", "ALL": "All Rules"}
 
     bundle = {
         "bundle": {
-            "series": actual_series,
-            "name": name_map.get(actual_series, "Kasra Rules"),
-            "version": str(max((r.sdk_version or 1) for r in rules)),
-            "total": len(rules),
+            "series": first_series,
+            "name": name_map.get(first_series, "Kasra Rules"),
+            "version": "1",
+            "total": len(all_rules),
         },
         "rules": [],
     }
 
-    for r in rules:
-        cat_name = _resolve_category_name(db, r.category_id)
-        rule_dict = {
-            "id": r.id,
-            "name": r.name,
-            "severity": r.severity,
-            "action": r.action,
-            "applicable_stages": list(_parse_json_col(r.applicable_stages, ["input"])),
-            "category": cat_name,
-            "detection": _parse_json_col(r.detection_config, {}),
-            "enabled": r.enabled,
-        }
-        if r.description:
-            rule_dict["description"] = r.description
-        bundle["rules"].append(rule_dict)
+    for rule_dict in all_rules:
+        entry = {k: v for k, v in rule_dict.items() if k != "_source"}
+        bundle["rules"].append(entry)
 
     return bundle

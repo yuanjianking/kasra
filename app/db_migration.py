@@ -159,12 +159,12 @@ SEED_CATEGORIES = [
 ]
 
 SEED_PATTERN_TYPES = [
-    {"name": "regex",      "label": "正则匹配",       "description": "Regular expression pattern matching"},
-    {"name": "keyword",    "label": "关键词匹配",     "description": "Exact keyword or substring matching"},
-    {"name": "dictionary", "label": "字典匹配",       "description": "Dictionary/list-based matching"},
-    {"name": "yaml_path",  "label": "YAML 路径匹配",  "description": "YAML key path with value regex"},
-    {"name": "dockerfile", "label": "Dockerfile 指令匹配", "description": "Dockerfile instruction matching"},
-    {"name": "keyvalue",   "label": "键值对匹配",    "description": "Key=value pair matching for .env files"},
+    {"name": "regex",      "label": "Regex Match",       "description": "Regular expression pattern matching"},
+    {"name": "keyword",    "label": "Keyword Match",     "description": "Exact keyword or substring matching"},
+    {"name": "dictionary", "label": "Dictionary Match",       "description": "Dictionary/list-based matching"},
+    {"name": "yaml_path",  "label": "YAML Path Match",  "description": "YAML key path with value regex"},
+    {"name": "dockerfile", "label": "Dockerfile Match", "description": "Dockerfile instruction matching"},
+    {"name": "keyvalue",   "label": "Key-Value Match",    "description": "Key=value pair matching for .env files"},
 ]
 
 

@@ -41,34 +41,42 @@ def list_rules(
 def export_rules(
     series: str | None = Query(default=None, description="Filter by bundle series: I, O, SEC, IAC"),
     category: str | None = Query(default=None, description="Filter by category name"),
+    source: str = Query(default="sdk", description="Rule source: sdk (built-in), custom, all"),
     db: DBSession = Depends(get_db),
 ):
     """Export rules as a JSON bundle."""
+    if source not in ("sdk", "custom", "all"):
+        raise HTTPException(status_code=400, detail="source must be sdk, custom, or all")
     bundle = rules_service.export_rules_to_bundle(
         db,
         series=series,
         category=category,
+        source=source,
     )
+    filename = f"kasra-rules-{source}-export.json"
     return JSONResponse(
         content=bundle,
         media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=kasra-rules-export.json"},
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
 @router.post("/import", status_code=201)
 async def import_rules(
     file: UploadFile,
+    target: str = Query(default="sdk", description="Import target: sdk (built-in) or custom"),
     db: DBSession = Depends(get_db),
 ):
     """Import rules from an uploaded JSON bundle file."""
+    if target not in ("sdk", "custom"):
+        raise HTTPException(status_code=400, detail="target must be sdk or custom")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
     if not file.filename.endswith(".json"):
         raise HTTPException(status_code=400, detail="Only .json files are supported")
 
     try:
-        stats = await rules_service.import_rules_from_file(db, file)
+        stats = await rules_service.import_rules_from_file(db, file, target=target)
         return stats
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

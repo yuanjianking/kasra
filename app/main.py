@@ -173,6 +173,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.exception("Failed to load rules from DB into engine")
 
+    # 3c. Sync Prometheus metrics (no longer uses sync_disabled_rules_from_db — it's
+    #     handled inside reload_rules_from_db)
+
     # Initialize Prometheus metrics
     if engine_service.is_initialized:
         engine = engine_service.engine
