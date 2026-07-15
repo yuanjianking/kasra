@@ -177,6 +177,15 @@ def _update_user_behavior(
         triggers[rid] = triggers.get(rid, 0) + 1
     behavior.rule_triggers = triggers
 
+    # Compute anomaly score (0-100) based on block rate and trigger diversity
+    if behavior.total_requests > 0:
+        block_rate_score = (behavior.blocked_requests / behavior.total_requests) * 50
+        diversity_score = min(len(triggers) * 10, 30)
+        volume_penalty = min(behavior.total_requests / 100, 20)
+        behavior.anomaly_score = min(
+            int(block_rate_score + diversity_score + volume_penalty), 100
+        )
+
 
 def scan_input(
     content: str,
@@ -255,6 +264,14 @@ def _log_code_review_findings(
             extra_metadata={"confidence": f.confidence, "message": f.message},
         )
         db.add(log_entry)
+
+    # Update user behavior summary (code review = warned)
+    if result.findings:
+        all_rule_ids = [f.rule_id for f in result.findings]
+        _update_user_behavior(
+            db, user_id=user_id, blocked=False,
+            warned=True, rule_ids=all_rule_ids,
+        )
 
     if commit:
         db.commit()

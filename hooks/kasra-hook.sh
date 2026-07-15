@@ -1,20 +1,14 @@
 #!/usr/bin/env bash
 # ===========================================================================
 # Kasra Hook — Security detection for Claude Code Hooks
-# Uses Kasra MCP Server HTTP API
-# NOTE: Set KASRA_SKIP_HOOK=1 to bypass (for internal Kasra dev work)
+# Uses Kasra API for input/output scanning
+# ===========================================================================
+# Events:
+#   UserPromptSubmit → JSON with decision=block or additionalContext
+#   PreToolUse       → JSON with permissionDecision + additionalContext
+#   PostToolUse      → JSON with additionalContext or decision=block
 # ===========================================================================
 
-# Allow internal development bypass
-if [ "${KASRA_SKIP_HOOK:-0}" = "1" ]; then
-    exit 0
-fi
-#
-# Events:
-#   UserPromptSubmit → exit 2 (stderr shown in dialog)
-#   PreToolUse       → exit 0 + JSON {permissionDecision: "deny"}
-#   PostToolUse      → exit 0 + JSON {additionalContext} for warnings
-# ===========================================================================
 set -o pipefail
 
 INPUT_JSON=$(cat)
@@ -24,7 +18,7 @@ INPUT_JSON=$(cat)
 HOOK_EVENT=$(python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('hook_event_name','') or d.get('_mode',''))" <<< "$INPUT_JSON" 2>/dev/null)
 [ -z "$HOOK_EVENT" ] && exit 0
 
-# ── Extract content to scan based on event type ─────────────────────────────
+# ── Extract content to scan ─────────────────────────────────────────────────
 SCAN_CONTENT=$(python3 -c "
 import sys, json
 try:
@@ -36,9 +30,8 @@ try:
         ti = d.get('tool_input', {}) or {}
         print(ti.get('command', '') or ti.get('content', '') or ti.get('new_string', '') or ti.get('file_path', '') or ti.get('pattern', '') or str(ti))
     elif ev == 'PostToolUse':
-        ti = d.get('tool_input', {}) or {}
         tr = d.get('tool_response', '') or ''
-        print(ti.get('command', '') or ti.get('content', '') or ti.get('new_string', '') or str(tr))
+        print(tr[:1000] if isinstance(tr, str) else str(tr))
     else:
         print(d.get('content', '') or str(d))
 except: pass
@@ -107,7 +100,8 @@ try:
         s = r.get('severity', '')
         i = r.get('rule_id', '?')
         n = r.get('rule_name', '')
-        parts.append('[' + s + '] ' + i + ': ' + n)
+        a = r.get('action', '?')
+        parts.append('[' + s + '][' + a + '] ' + i + ': ' + n)
     print('; '.join(parts))
 except: print('unknown')
 " 2>/dev/null
@@ -117,16 +111,18 @@ except: print('unknown')
 # Event handlers
 # ═════════════════════════════════════════════════════════════════════════════
 
-# UserPromptSubmit: block via exit 2 (stderr shown in dialog)
-handle_blocked_user_prompt() {
+handle_blocked() {
     local rule_info="$1"
     log_event "BLOCKED" "$rule_info"
-    echo "🔒 Kasra Security — Your message was blocked. Reason: $rule_info" >&2
-    exit 2
+    python3 - "$rule_info" << 'PYEOF'
+import sys, json
+reason = f"🔒 Kasra Security blocked your message. Reason: {sys.argv[1]}"
+print(json.dumps({"decision": "block", "reason": reason, "hookSpecificOutput": {"hookEventName": "UserPromptSubmit"}}))
+PYEOF
+    exit 0
 }
 
-# PreToolUse: deny via JSON
-handle_blocked_pre_tool() {
+handle_pre_tool_blocked() {
     local rule_info="$1"
     log_event "BLOCKED" "$rule_info"
     python3 - "$rule_info" << 'PYEOF'
@@ -137,41 +133,59 @@ PYEOF
     exit 0
 }
 
-# PostToolUse: warn via additionalContext
 handle_warning() {
-    local warn_info="$1"
-    log_event "WARN" "$warn_info"
-    python3 - "$warn_info" << 'PYEOF'
+    local event_name="$1" rule_info="$2"
+    log_event "AUDIT" "$rule_info"
+
+    case "$event_name" in
+        UserPromptSubmit)
+            python3 - "$rule_info" << 'PYEOF'
+import sys, json
+msg = f"⚠️ Kasra Security audit: {sys.argv[1]}"
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": msg}}))
+PYEOF
+            ;;
+        PreToolUse)
+            python3 - "$rule_info" << 'PYEOF'
+import sys, json
+msg = f"⚠️ Kasra Security audit: {sys.argv[1]}"
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "additionalContext": msg}}))
+PYEOF
+            ;;
+        PostToolUse)
+            python3 - "$rule_info" << 'PYEOF'
 import sys, json
 msg = f"⚠️ Kasra Security warning: {sys.argv[1]}"
 print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
 PYEOF
+            ;;
+    esac
     exit 0
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Main dispatch
 # ═════════════════════════════════════════════════════════════════════════════
-INPUT_MODE="${1:-input}"
 
 case "$HOOK_EVENT" in
     UserPromptSubmit)
         result=$(api_scan "input")
         rc=$?
-        [ $rc -eq 1 ] && handle_blocked_user_prompt "$(echo "$result" | format_rules)"
-        [ $rc -eq 3 ] && log_event "WARN" "$(echo "$result" | format_rules)"
+        [ $rc -eq 1 ] && handle_blocked "$(echo "$result" | format_rules)"
+        [ $rc -eq 3 ] && handle_warning "UserPromptSubmit" "$(echo "$result" | format_rules)"
         exit 0
         ;;
     PreToolUse)
         result=$(api_scan "input")
         rc=$?
-        [ $rc -eq 1 ] && handle_blocked_pre_tool "$(echo "$result" | format_rules)"
+        [ $rc -eq 1 ] && handle_pre_tool_blocked "$(echo "$result" | format_rules)"
+        [ $rc -eq 3 ] && handle_warning "PreToolUse" "$(echo "$result" | format_rules)"
         exit 0
         ;;
     PostToolUse)
         result=$(api_scan "output")
         rc=$?
-        [ $rc -eq 1 ] || [ $rc -eq 3 ] && handle_warning "$(echo "$result" | format_rules)"
+        [ $rc -eq 1 ] || [ $rc -eq 3 ] && handle_warning "PostToolUse" "$(echo "$result" | format_rules)"
         exit 0
         ;;
     *)

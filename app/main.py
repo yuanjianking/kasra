@@ -143,17 +143,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         if log.user_id == "demo-user":
                             rid = log.rule_id
                             demo_triggers[rid] = demo_triggers.get(rid, 0) + 1
+
+                    # Demo-user: 5 reqs, 3 blocked, 5 unique rule triggers
+                    demo_anomaly = min(int((3 / 5) * 50 + min(5 * 10, 30) + min(5 / 100, 20)), 100)
                     db.add(UserBehavior(
                         user_id="demo-user", date=today,
                         total_requests=5, blocked_requests=3, warned_requests=1,
                         first_request=now.time(), last_request=now.time(),
-                        rule_triggers=demo_triggers,
+                        rule_triggers=demo_triggers, anomaly_score=demo_anomaly,
                     ))
+                    # Admin: 1 req, 0 blocked, 1 rule trigger
+                    admin_anomaly = min(int((0 / 1) * 50 + min(1 * 10, 30) + min(1 / 100, 20)), 100)
                     db.add(UserBehavior(
                         user_id="admin", date=today,
                         total_requests=1, blocked_requests=0, warned_requests=1,
                         first_request=now.time(), last_request=now.time(),
-                        rule_triggers={"SEC-05": 1},
+                        rule_triggers={"SEC-05": 1}, anomaly_score=admin_anomaly,
                     ))
                     db.commit()
                 logger.info("Development data seeded: users=%d, logs=%d, behaviors=%d", 2, len(sample_logs), 2)
