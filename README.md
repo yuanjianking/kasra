@@ -21,10 +21,10 @@ Kasra provides three integration methods for different use cases:
 │  │  Feature: Full input/output interception at the harness level  │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
-│  ┌─── Method 2: MCP Protocol ────────────────────────────────────┐  │
-│  │  kasra-mcp SSE on :8091 → kasra_scan_file                     │  │
-│  │  Covers: Code review (SEC/IAC rules) via AI tools              │  │
-│  │  Feature: Scan files/directories for security vulnerabilities  │  │
+│  ┌─── Method 2: kasra-mcp (Standalone) ──────────────────────────┐  │
+│  │  pip install kasra-mcp                                        │  │
+│  │  Runs on your machine, reads local files, calls Kasra API     │  │
+│  │  Feature: Scan files/directories via AI tools (Claude, etc.)  │  │
 │  └─────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │  ┌─── Method 3: REST API ────────────────────────────────────────┐  │
@@ -70,17 +70,25 @@ export KASRA_HOOK_API_KEY=your-api-key
 
 ---
 
-### Method 2: MCP Protocol (Code Review)
+### Method 2: kasra-mcp (Standalone Code Review)
 
-Kasra exposes a dedicated MCP SSE server on port `8091` for code security review.
+`kasra-mcp` is a standalone Python package that runs on your local machine, reads files directly, and sends them to the Kasra API for security scanning.
 
-#### MCP Tools
+```bash
+# Install on your machine
+pip install kasra-mcp
 
-| Tool | Description | Parameters |
-|------|-------------|-----------|
-| `kasra_scan_file` | Scan a file or directory for security vulnerabilities | `path` |
-| `kasra_get_rules` | List all security rules with severity, action, and status | `severity?`, `enabled_only?` |
-| `health` | Check the RuleEngine health status | None |
+# Start the MCP server
+kasra-mcp
+# Listening on http://127.0.0.1:8091
+```
+
+#### Configuration
+
+```bash
+export KASRA_API_URL=http://your-server:8090
+export KASRA_API_KEY=your-api-key
+```
 
 #### Claude Desktop / Cursor Integration
 
@@ -88,25 +96,20 @@ Kasra exposes a dedicated MCP SSE server on port `8091` for code security review
 {
   "mcpServers": {
     "kasra": {
-      "type": "sse",
-      "url": "http://localhost:8091/sse"
+      "command": "kasra-mcp",
+      "args": []
     }
   }
 }
 ```
 
-Or via command:
+#### MCP Tools
 
-```json
-{
-  "mcpServers": {
-    "kasra": {
-      "command": "python",
-      "args": ["-m", "app.mcp_server"]
-    }
-  }
-}
-```
+| Tool | Description | Parameters |
+|------|-------------|-----------|
+| `kasra_scan_file` | Scan a file or directory for security vulnerabilities | `path` |
+| `kasra_get_rules` | List all security rules with severity, action, and status | `severity?`, `enabled_only?` |
+| `health` | Check the Kasra API health status | None |
 
 ---
 
@@ -138,6 +141,12 @@ curl -X POST http://localhost:8090/v1/scan/batch \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{"path": "./src", "user_id": "dev1"}'
+
+# Scan file content directly (used by kasra-mcp)
+curl -X POST http://localhost:8090/v1/scan/file \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key" \
+  -d '{"content": "import os\nos.system(\"rm -rf /\")\n", "filename": "danger.py"}'
 ```
 
 #### Rule Management
@@ -156,14 +165,33 @@ curl -X POST http://localhost:8090/v1/rules \
   -H "X-API-Key: your-api-key" \
   -d '{"id": "U-01", "name": "Custom Rule", "severity": "P1", "action": "warn"}'
 
+# Import rules from JSON bundle (target: sdk or custom)
+curl -X POST "http://localhost:8090/v1/rules/import?target=sdk" \
+  -H "X-API-Key: your-api-key" \
+  -F "file=@rules-bundle.json"
+
+# Export rules as JSON bundle (source: sdk, custom, or all)
+curl "http://localhost:8090/v1/rules/export?source=all" \
+  -H "X-API-Key: your-api-key"
+
 # Enable or disable a rule
 curl -X PUT http://localhost:8090/v1/rules/I-01 \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{"enabled": false}'
 
-# Delete a custom rule or reset an SDK rule override
-curl -X DELETE http://localhost:8090/v1/rules/I-01 -H "X-API-Key: your-api-key"
+# Delete a custom rule
+curl -X DELETE http://localhost:8090/v1/rules/U-01 -H "X-API-Key: your-api-key"
+```
+
+#### Categories
+
+```bash
+# List all rule categories
+curl http://localhost:8090/v1/categories -H "X-API-Key: your-api-key"
+
+# List all pattern types
+curl http://localhost:8090/v1/categories/pattern-types -H "X-API-Key: your-api-key"
 ```
 
 #### Audit & Reports
@@ -207,15 +235,22 @@ curl "http://localhost:8090/v1/dashboard/users/behavior?user_id=dev1" \
 | | | | |
 | `POST` | `/v1/scan/input` | Input content detection (I-series rules) | API Key |
 | `POST` | `/v1/scan/output` | Output content detection (O-series rules) | API Key |
-| `POST` | `/v1/scan/batch` | Code review — scan file or directory (SEC/IAC rules) | API Key |
+| `POST` | `/v1/scan/batch` | Code review — scan server path (SEC/IAC rules) | API Key |
+| `POST` | `/v1/scan/file` | Code review — scan uploaded file content (used by kasra-mcp) | API Key |
 | | | | |
 | `GET` | `/v1/rules` | List all rules (supports `group`, `severity`, `enabled_only`, `custom_only`, pagination) | API Key |
 | `GET` | `/v1/rules/{rule_id}` | Get a single rule by ID | API Key |
-| `POST` | `/v1/rules` | Create a custom rule (`pattern_type`, `pattern_value`, `applicable_stages`, `target_files`) | API Key |
-| `PUT` | `/v1/rules/{rule_id}` | Update a rule (enable/disable, change severity, etc.) | API Key |
-| `DELETE` | `/v1/rules/{rule_id}` | Delete a custom rule or reset an SDK override | API Key |
+| `POST` | `/v1/rules` | Create a custom rule | API Key |
+| `PUT` | `/v1/rules/{rule_id}` | Update a rule (enable/disable) | API Key |
+| `DELETE` | `/v1/rules/{rule_id}` | Delete a custom rule | API Key |
+| `POST` | `/v1/rules/import` | Import rules from JSON bundle (`target=sdk` or `target=custom`) | API Key |
+| `GET` | `/v1/rules/export` | Export rules as JSON bundle (`source=sdk`, `custom`, or `all`) | API Key |
 | | | | |
-| `GET` | `/v1/audit/logs` | Query audit logs (`user_id`, `severity`, `direction`, `status`, `start_time`, `end_time`, pagination) | API Key |
+| `GET` | `/v1/categories` | List all rule categories | API Key |
+| `POST` | `/v1/categories` | Create a new category | API Key |
+| `GET` | `/v1/categories/pattern-types` | List pattern types | API Key |
+| | | | |
+| `GET` | `/v1/audit/logs` | Query audit logs (filters + pagination) | API Key |
 | `PATCH` | `/v1/audit/logs/{id}` | Update audit log status (`pending` / `resolved` / `fp`) | API Key |
 | `POST` | `/v1/audit/logs/batch-update` | Batch update audit log statuses | API Key |
 | `GET` | `/v1/audit/report` | Compliance report summary | API Key |
@@ -227,14 +262,6 @@ curl "http://localhost:8090/v1/dashboard/users/behavior?user_id=dev1" \
 | | | | |
 | `ALL` | `/v1/proxy/{path}` | HTTP proxy forwarding to upstream AI APIs | API Key |
 
-### MCP Tools
-
-| Tool | Description | Parameters |
-|------|-------------|-----------|
-| `kasra_scan_file` | Scan a file or directory for security vulnerabilities (SEC/IAC rules) | `path` |
-| `kasra_get_rules` | List all loaded rules | `severity?`, `enabled_only?` |
-| `health` | Engine health check | None |
-
 Full interactive API documentation: `http://localhost:8090/docs`
 
 ---
@@ -242,7 +269,7 @@ Full interactive API documentation: `http://localhost:8090/docs`
 ## Quick Start
 
 ```bash
-# Start service (development mode with SQLite)
+# Start services
 docker compose up -d
 
 # Verify
@@ -265,9 +292,10 @@ open http://localhost:8080
 |---------|------|-------------|
 | **kasra-api** | `:8090` | FastAPI REST API + HTTPS CONNECT proxy (`:8443`) |
 | **kasra-frontend** | `:8080` | React SPA web dashboard |
-| **kasra-mcp** | `:8091` | MCP SSE server (code review tools) |
 | **postgres** | `:5432` | PostgreSQL database |
 | **adminer** | `:8083` | Database administration UI |
+
+> **kasra-mcp** is no longer included in Docker — install it separately: `pip install kasra-mcp`
 
 ## Architecture
 
@@ -276,22 +304,22 @@ open http://localhost:8080
 │                      Kasra Platform                                  │
 │                                                                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │  REST API    │  │  MCP Server  │  │  CONNECT     │              │
-│  │  (:8090)     │  │  (:8091)     │  │  Proxy       │              │
-│  └──────┬───────┘  └──────┬───────┘  │  (:8443)     │              │
-│         │                │           └──────┬───────┘              │
-│         ▼                ▼                  ▼                      │
+│  │  REST API    │  │  kasra-mcp   │  │  CONNECT     │              │
+│  │  (:8090)     │  │  (separate)  │  │  Proxy       │              │
+│  └──────┬───────┘  └──────────────┘  │  (:8443)     │              │
+│         │                            └──────┬───────┘              │
+│         ▼                                   ▼                      │
 │  ┌─────────────────────────────────────────────────────┐          │
 │  │              Rule Engine (kasra-sdk)                  │          │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐     │          │
 │  │  │ Input    │ │ Output   │ │ Code Review      │     │          │
 │  │  │ Pipeline │ │ Pipeline │ │ (SEC/IAC rules)  │     │          │
 │  │  └──────────┘ └──────────┘ └──────────────────┘     │          │
-│  │  110+ SDK rules + custom rules (created via UI/API)               │          │
+│  │  193 rules (110 I/O + 83 CR) + custom rules        │          │
 │  └─────────────────────────────────────────────────────┘          │
 │                                                                     │
 │  ┌─────────────────────────────────────────────────────┐          │
-│  │  PostgreSQL (audit_logs, rules_config, users, ...)  │          │
+│  │  PostgreSQL (audit_logs, rules, categories, ...)     │          │
 │  └─────────────────────────────────────────────────────┘          │
 └─────────────────────────────────────────────────────────────────────┘
 ```

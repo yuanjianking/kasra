@@ -12,6 +12,7 @@ from app.database import get_db
 from app.schemas.scan import (
     BatchScanRequest,
     BatchScanResponse,
+    ScanFileRequest,
     ScanInputRequest,
     ScanOutputRequest,
     ScanResponse,
@@ -59,6 +60,51 @@ def scan_output(
         request_id=req.request_id,
     )
     return result
+
+
+@router.post("/file", response_model=BatchScanResponse)
+def scan_file(
+    req: ScanFileRequest,
+    db: DBSession = Depends(get_db),
+):
+    """Scan a single file's content for security issues.
+
+    Accepts file content directly (from MCP or API clients),
+    writes it to a temporary file, and runs code review rules.
+    This enables local file scanning without mounting volumes.
+    """
+    import tempfile
+
+    # Determine a safe filename for extension detection
+    safe_name = req.filename or "uploaded_file"
+    # Only keep the basename and extension
+    safe_name = Path(safe_name).name
+    # Ensure a reasonable extension for scanning
+    if "." not in safe_name:
+        safe_name = safe_name + ".txt"
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=safe_name, delete=False,
+        ) as f:
+            f.write(req.content)
+            tmp_path = f.name
+
+        result = scan_service.scan_batch(
+            path=tmp_path,
+            db=db,
+            user_id=req.user_id,
+        )
+        return result
+    except Exception as e:
+        logger.exception("File scan failed")
+        raise HTTPException(status_code=500, detail="Internal scan error")
+    finally:
+        # Clean up temp file
+        try:
+            os.unlink(tmp_path)
+        except (NameError, OSError):
+            pass
 
 
 @router.post("/batch", response_model=BatchScanResponse)

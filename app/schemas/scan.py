@@ -36,6 +36,14 @@ class BatchScanRequest(BaseModel):
     user_id: str | None = Field(default=None, description="Requesting user")
 
 
+class ScanFileRequest(BaseModel):
+    """Single file scan request — send file content for code review."""
+
+    content: str = Field(..., min_length=1, description="File content to scan")
+    filename: str | None = Field(default=None, description="Original filename (for extension detection)")
+    user_id: str | None = Field(default=None, description="Requesting user")
+
+
 # ── Responses ──
 
 

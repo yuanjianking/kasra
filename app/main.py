@@ -323,17 +323,10 @@ def create_app() -> FastAPI:
     from app.api.router import api_router
     app.include_router(api_router)
 
-    # ── MCP Server (SSE transport) — skip when running standalone MCP ──
-    if not os.environ.get("KASRA_SKIP_MCP"):
-        try:
-            from app.mcp_server import kasra_server
-            mcp_sse_app = kasra_server.sse_app()
-            app.mount("/v1/mcp", mcp_sse_app)
-            logger.info("MCP SSE endpoint mounted at /v1/mcp/sse")
-        except Exception as exc:
-            logger.warning("MCP SSE mount skipped: %s", exc)
-
     # ── Serve Frontend Static Files — skip when running standalone frontend ──
+    # MCP server removed in v0.4 — install kasra-mcp separately:
+    #   pip install kasra-mcp
+    #   kasra-mcp
     if not os.environ.get("KASRA_SKIP_FRONTEND"):
         frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
         if frontend_dist.exists():
