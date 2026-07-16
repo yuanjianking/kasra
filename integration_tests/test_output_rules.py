@@ -106,3 +106,220 @@ class TestOutputRuleDetection:
         assert resp.status_code == 200
         data = resp.json()
         assert data["blocked"] is True, f"{rule_id} (P0+block) should set blocked=true"
+
+
+# ===========================================================================
+# Breadth-first: safe content, API boundaries, edge cases
+# ===========================================================================
+
+class TestOutputSafeContent:
+    """Negative tests: safe content should NOT trigger output rules."""
+
+    SAFE_OUTPUT_CONTENT = [
+        ("O-01", "Use a safe parsing library for user input"),
+        ("O-02", "Please clean up temporary files using rm with caution"),
+        ("O-03", "Use subprocess.run with argument list, not shell=True"),
+        ("O-04", "Use parameterized queries for SQL"),
+        ("O-05", "Validate user input before database queries"),
+        ("O-06", "try:\n    risky()\nexcept SpecificError:\n    handle()"),
+        ("O-07", "Use secrets module for token generation"),
+        ("O-08", "Disable external entities in XML parser"),
+        ("O-09", "Use template engine with auto-escaping"),
+        ("O-10", "Use parameterized LDAP queries"),
+        ("O-11", "Use JSON serializer instead of pickle"),
+        ("O-12", "Validate and restrict URLs the server can fetch"),
+        ("O-13", "Use verify=True and proper certificate validation"),
+        ("O-14", "Use Object.assign with a new empty object target"),
+        ("O-15", "Use os.path.realpath to resolve symlinks before opening"),
+        ("O-16", "Use simple regex patterns to avoid ReDoS"),
+        ("O-17", "Use textContent instead of innerHTML"),
+        ("O-18", "Store API keys in environment variables"),
+        ("O-19", "Load encryption keys from a secure key management service"),
+        ("O-20", "Use strong passwords with at least 12 characters"),
+        ("O-21", "Here is a simple sorting algorithm implementation"),
+        ("O-22", "This information is publicly available"),
+        ("O-23", "Set DEBUG = False in production"),
+        ("O-24", 'logger.info(f"User ID: {user_id}")'),
+        ("O-25", "DB_HOST should be configured via environment variable"),
+        ("O-26", "Use chmod 644 for configuration files"),
+        ("O-27", "Use a context manager to safely handle files"),
+        ("O-28", "Use fgets() instead of gets() for safe input"),
+        ("O-29", "Return a generic error message to the client"),
+        ("O-30", "Use TLS encryption for secure network connections"),
+        ("O-31", "import base64"),
+        ("O-32", "Use RS256 for JWT signing"),
+        ("O-33", "pip install from PyPI"),
+        ("O-34", "Use the latest lodash version"),
+        ("O-35", "Visit our docs at https://docs.example.com"),
+        ("O-36", "Pin flask to 2.3.0"),
+        ("O-37", "Use pip install from PyPI"),
+        ("O-38", "Here's how to set up a chemistry lab safely"),
+        ("O-39", "Here's how encryption works"),
+        ("O-40", "The MIT license allows free use of the software"),
+        ("O-41", "Customer details are in the CRM system"),
+        ("O-42", "This is a common security vulnerability"),
+        ("O-43", "Use HTTPS for data in transit"),
+        ("O-44", "Choose an AWS region that complies with local regulations"),
+        ("O-45", "Validate and sanitize user input before saving"),
+        ("O-46", "Follow GDPR guidelines for data handling"),
+        ("O-47", "Use bcrypt or Argon2 for password hashing"),
+        ("O-48", "Use semantic HTML elements with proper heading tags"),
+        ("O-49", "Use translation files for user-facing strings"),
+        ("O-50", "Use user locale setting for timezone"),
+        ("O-52", "Don't forget to add audit logging for financial operations"),
+        ("O-53", "Use ON DELETE CASCADE for related tables"),
+    ]
+
+    @pytest.mark.parametrize("rule_id,content", SAFE_OUTPUT_CONTENT)
+    def test_o_rule_safe_content(
+        self, client: TestClient, auth_headers: dict, rule_id: str, content: str
+    ):
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-safe"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        triggered_ids = [r["rule_id"] for r in data["triggered_rules"]]
+        assert rule_id not in triggered_ids, (
+            f"{rule_id}: safe output should not trigger, got: {triggered_ids}"
+        )
+
+
+class TestOutputAPIBoundaries:
+    """API error handling and edge cases for output scan."""
+
+    def test_empty_content(self, client: TestClient, auth_headers: dict):
+        resp = client.post("/v1/scan/output", json={"content": "", "user_id": "int-o"}, headers=auth_headers)
+        assert resp.status_code in (200, 422)
+
+    def test_missing_content(self, client: TestClient, auth_headers: dict):
+        resp = client.post("/v1/scan/output", json={"user_id": "int-o"}, headers=auth_headers)
+        assert resp.status_code == 422
+
+    def test_auth_required(self, client: TestClient):
+        resp = client.post("/v1/scan/output", json={"content": "test", "user_id": "int-o"})
+        assert resp.status_code == 401
+
+    def test_invalid_auth(self, client: TestClient):
+        resp = client.post(
+            "/v1/scan/output", json={"content": "test"}, headers={"X-API-Key": "wrong"}
+        )
+        assert resp.status_code == 401
+
+    def test_oversized_body(self, client: TestClient, auth_headers: dict):
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": "x" * (12 * 1024 * 1024)},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 413
+
+    def test_response_format(self, client: TestClient, auth_headers: dict):
+        """Output scan response has correct schema."""
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": "eval(user_input) can be dangerous", "user_id": "int-o-format"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "blocked" in data
+        assert "action" in data
+        assert "severity" in data
+        assert "triggered_rules" in data
+        assert "execution_time_ms" in data
+        assert isinstance(data["blocked"], bool)
+        assert data["execution_time_ms"] >= 0
+
+
+class TestOutputMultiRule:
+    """Content triggering multiple output rules simultaneously."""
+
+    def test_multiple_output_triggers(self, client: TestClient, auth_headers: dict):
+        content = (
+            "Use eval for dynamic code execution. Also, "
+            "the password = \"password123\" is for testing."
+        )
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-multi"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        triggered_ids = [r["rule_id"] for r in data["triggered_rules"]]
+        assert len(triggered_ids) >= 2, f"Expected >=2 rules, got: {triggered_ids}"
+
+    def test_safe_output_no_triggers(self, client: TestClient, auth_headers: dict):
+        """Completely safe output should not trigger any rules."""
+        content = (
+            "To implement a binary search in Python, you can write a function "
+            "that takes a sorted list and a target value, then repeatedly divides "
+            "the search interval in half."
+        )
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-clean"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["triggered_rules"] == [], f"Clean output triggered: {data['triggered_rules']}"
+        assert data["blocked"] is False
+
+
+class TestOutputEdgeCases:
+    """Edge cases for output scanning."""
+
+    def test_very_long_output(self, client: TestClient, auth_headers: dict):
+        """Very long safe output should not be blocked."""
+        content = "This is a safe output. " * 10000
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-long"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200, f"Long output should not fail: {resp.status_code}"
+        data = resp.json()
+        assert data["blocked"] is False, "Long safe output should not be blocked"
+
+    def test_unicode_output(self, client: TestClient, auth_headers: dict):
+        """Unicode output should be processed correctly."""
+        content = "🌐 国际化支持: こんにちは世界 Привет мир"
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-unicode"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["blocked"] is False
+
+    def test_code_block_output(self, client: TestClient, auth_headers: dict):
+        """Code blocks in output should be scanned correctly."""
+        content = """Here is an example:
+
+```python
+def hello():
+    print("Hello, World!")
+```
+
+This function prints hello."""
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-codeblock"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    def test_html_in_output(self, client: TestClient, auth_headers: dict):
+        """HTML content in output should be scanned."""
+        content = '<div class="container"><p>Safe HTML output</p></div>'
+        resp = client.post(
+            "/v1/scan/output",
+            json={"content": content, "user_id": "int-o-html"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200

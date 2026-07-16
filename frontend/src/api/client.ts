@@ -302,3 +302,65 @@ export async function batchUpdateAuditLogStatus(ids: number[], status: string) {
     body: JSON.stringify({ ids, status }),
   });
 }
+
+// ── Dictionary API ──
+
+export interface DictionaryItem {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  entries: string[];
+  category_id: number | null;
+  is_active: boolean;
+  version: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export async function getDictionaries(params: { category_id?: number; is_active?: boolean } = {}) {
+  const qs = new URLSearchParams();
+  if (params.category_id) qs.set('category_id', String(params.category_id));
+  if (params.is_active !== undefined) qs.set('is_active', String(params.is_active));
+  const query = qs.toString();
+  return request<DictionaryItem[]>(`/v1/dictionaries${query ? `?${query}` : ''}`);
+}
+
+export async function getDictionary(id: number) {
+  return request<DictionaryItem>(`/v1/dictionaries/${id}`);
+}
+
+export async function createDictionary(data: { code: string; name: string; description?: string; entries?: string[]; category_id?: number }) {
+  return request<DictionaryItem>('/v1/dictionaries', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateDictionary(id: number, data: { name?: string; description?: string; entries?: string[]; category_id?: number | null; is_active?: boolean }) {
+  return request<DictionaryItem>(`/v1/dictionaries/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDictionary(id: number) {
+  await fetch(`/v1/dictionaries/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-API-Key': localStorage.getItem('kasra_api_key') || '' },
+  });
+}
+
+export async function addDictionaryEntries(id: number, entries: string[]) {
+  return request<DictionaryItem>(`/v1/dictionaries/${id}/entries`, {
+    method: 'POST',
+    body: JSON.stringify({ entries }),
+  });
+}
+
+export async function removeDictionaryEntries(id: number, entries: string[]) {
+  return request<DictionaryItem>(`/v1/dictionaries/${id}/entries`, {
+    method: 'DELETE',
+    body: JSON.stringify({ entries }),
+  });
+}

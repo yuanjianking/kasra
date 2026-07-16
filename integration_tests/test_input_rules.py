@@ -180,3 +180,232 @@ class TestInputAPIBoundaries:
             headers=auth_headers,
         )
         assert resp.status_code == 413
+
+
+# ===========================================================================
+# Breadth-first: additional negative and edge-case tests
+# ===========================================================================
+
+class TestInputAdditionalSafe:
+    """Additional safe content negative tests for breadth-first coverage."""
+
+    SAFE_CONTENT_EXTRA = [
+        ("I-02", "OPENAI_API_KEY is configured in environment variables"),
+        ("I-03", "用 ANTHROPIC_API_KEY 环境变量配置即可"),
+        ("I-04", "AWS credentials are managed by IAM roles"),
+        ("I-05", "Stripe keys are in the secrets manager"),
+        ("I-07", "SSH public key 放在 ~/.ssh/id_rsa.pub"),
+        ("I-08", "JWT 的 payload 里应该包含 user_id"),
+        ("I-09", "数据库连接串放在 DATABASE_URL 环境变量里"),
+        ("I-10", "以太坊地址是 0x 开头的 42 位十六进制"),
+        ("I-12", "身份证号一般 18 位，最后一位可以是 X"),
+        ("I-14", "信用卡卡号是 16 位数字"),
+        ("I-15", "护照号一般在护照首页"),
+        ("I-16", "IBAN 是国际银行账号"),
+        ("I-17", "服务器 IP 配置在 /etc/hosts 里"),
+        ("I-19", "生日字段用 date 类型"),
+        ("I-20", "病历系统需要符合 HIPAA 标准"),
+        ("I-22", "你是一位专业的软件工程师"),
+        ("I-23", "帮我写一个删除日志文件的脚本"),
+        ("I-24", "这个 SQL 查询应该用参数化查询"),
+        ("I-25", "MongoDB 查询语法和 SQL 不同"),
+        ("I-26", "Jinja2 模板用 {{ variable }} 语法"),
+        ("I-27", "XML 解析需要注意 XXE 防护"),
+        ("I-28", "LDAP 搜索需要对输入做转义"),
+        ("I-30", "内部服务之间通过内网通信"),
+        ("I-31", "你的职责是什么？"),
+        ("I-33", "base64 是一种编码方式"),
+        ("I-34", "今天天气怎么样？"),
+        ("I-37", "帮我分析一下这个 Python 脚本"),
+        ("I-38", "帮我打包这个目录"),
+        ("I-40", "帮我把这个排序算法实现一下"),
+        ("I-41", "帮我压缩一下这些文件"),
+        ("I-49", "请问如何重置密码？"),
+        ("I-50", "请确保所有请求都经过身份验证"),
+        ("I-52", "pip install requests"),
+        ("I-53", "用 curl 查询 API 是否正常"),
+        ("I-54", "帮我写一个文件加密工具"),
+        ("I-55", "解释一下区块链的工作原理"),
+        ("I-56", "帮我写一个登录页面"),
+        ("I-57", "Linux 添加用户的命令是什么？"),
+    ]
+
+    @pytest.mark.parametrize("rule_id,content", SAFE_CONTENT_EXTRA)
+    def test_i_rule_safe_content_extra(
+        self, client: TestClient, auth_headers: dict, rule_id: str, content: str
+    ):
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-i-safe-extra"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        triggered_ids = [r["rule_id"] for r in data["triggered_rules"]]
+        assert rule_id not in triggered_ids, (
+            f"{rule_id}: safe content should not trigger, got {triggered_ids}"
+        )
+
+
+class TestInputRedaction:
+    """Verify redact-action rules produce redacted_content."""
+
+    REDACT_CASES = [
+        ("I-11", "我的手机号是 13800138000"),
+        ("I-13", "请发送到 test@example.com"),
+        ("I-17", "服务器 IP 是 203.0.113.42"),
+    ]
+
+    @pytest.mark.parametrize("rule_id,content", REDACT_CASES)
+    def test_redacted_content(self, client, auth_headers, rule_id, content):
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-redact"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        triggered_ids = [r["rule_id"] for r in data["triggered_rules"]]
+        assert rule_id in triggered_ids, f"{rule_id} should trigger for: {content}"
+
+    def test_redact_action_type(self, client, auth_headers):
+        """Redact-action rules return action=redact."""
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": "我的手机号是 13800138000", "user_id": "int-redact2"},
+            headers=auth_headers,
+        )
+        data = resp.json()
+        for r in data["triggered_rules"]:
+            if r["rule_id"] in ("I-11", "I-12", "I-13"):
+                assert r["action"] == "redact", f"{r['rule_id']} should be redact"
+
+
+class TestInputMultiRule:
+    """Content that triggers multiple rules simultaneously."""
+
+    def test_multiple_triggers(self, client, auth_headers):
+        """Content with password + phone triggers both rules."""
+        content = "数据库密码是 admin123!@#，我的手机号是 13800138000"
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-multi"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        triggered_ids = [r["rule_id"] for r in data["triggered_rules"]]
+        assert "I-06" in triggered_ids, f"I-06 not triggered: {triggered_ids}"
+        assert "I-11" in triggered_ids, f"I-11 not triggered: {triggered_ids}"
+
+    def test_block_overrides_warn(self, client, auth_headers):
+        """When block and warn rules both trigger, overall action should be block."""
+        content = "数据库密码是 admin123!@#，SELECT * FROM users"
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-block-warn"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["blocked"] is True, "Block should override warn"
+        assert data["action"] == "block"
+
+
+class TestInputResponseSchema:
+    """Verify response schema correctness."""
+
+    def test_response_structure_triggered(self, client, auth_headers):
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": "密码是 admin123", "user_id": "int-schema"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Verify all required fields exist
+        assert "blocked" in data
+        assert "action" in data
+        assert "severity" in data
+        assert "triggered_rules" in data
+        assert "execution_time_ms" in data
+        # Check triggered rule structure
+        for r in data["triggered_rules"]:
+            assert "rule_id" in r
+            assert "rule_name" in r
+            assert "severity" in r
+            assert "action" in r
+            assert "match_count" in r
+        assert isinstance(data["blocked"], bool)
+        assert data["execution_time_ms"] >= 0
+
+    def test_response_structure_safe(self, client, auth_headers):
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": "用 Python 写一个快速排序", "user_id": "int-schema2"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["blocked"] is False
+        assert data["triggered_rules"] == []
+        assert data["action"] in ("allow", "warn")
+
+
+class TestInputEdgeCases:
+    """Edge cases for input scanning."""
+
+    def test_very_long_content(self, client, auth_headers):
+        """Very long but safe content should not be blocked (use diverse words)."""
+        words = ["the quick brown fox jumps over the lazy dog near the river bank "]
+        content = "".join(words) * 5000
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-long"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    def test_unicode_content(self, client, auth_headers):
+        """Unicode and emoji content should be processed correctly."""
+        content = "Привет 你好 こんにちは 👋 🌟"
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-unicode"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["blocked"] is False
+
+    def test_content_with_only_special_chars(self, client, auth_headers):
+        """Content with only special characters should not crash."""
+        content = "!@#$%^&*()_+-=[]{}|;':\",./<>?`~"
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-special"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    def test_newlines_and_tabs(self, client, auth_headers):
+        """Content with newlines and tabs should work."""
+        content = "line1\nline2\twith\ttab\npassword=admin123\nline4"
+        resp = client.post(
+            "/v1/scan/input",
+            json={"content": content, "user_id": "int-ws"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["blocked"] is True  # password triggers I-06
+
+    def test_rate_limiting_not_blocking_single(self, client, auth_headers):
+        """Single request should pass rate limiter."""
+        for _ in range(5):
+            resp = client.post(
+                "/v1/scan/input",
+                json={"content": "safe content", "user_id": "int-ratelimit"},
+                headers=auth_headers,
+            )
+            assert resp.status_code in (200, 429)

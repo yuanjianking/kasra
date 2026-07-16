@@ -67,6 +67,21 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 
+-- ── Dictionaries (keyword lists referenced by rules) ───────────────────────
+CREATE TABLE IF NOT EXISTS dictionaries (
+    id              SERIAL PRIMARY KEY,
+    code            VARCHAR(128) UNIQUE NOT NULL,  -- gdpr_health, prompt_injection
+    name            VARCHAR(256) NOT NULL,
+    description     TEXT,
+    entries         TEXT[] NOT NULL DEFAULT '{}',
+    category_id     INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    is_active       BOOLEAN DEFAULT true,
+    version         INTEGER DEFAULT 1,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+
 -- ── Detection pattern types (master table) ──────────────────────────────────
 -- regex, keyword, dictionary, yaml_path, dockerfile, keyvalue
 CREATE TABLE IF NOT EXISTS pattern_types (
@@ -238,6 +253,10 @@ COMMENT ON COLUMN audit_logs.gdpr_relevant IS 'Whether GDPR compliance is releva
 
 COMMENT ON TABLE  categories      IS 'Rule categories master: I, O, SEC, IAC, BEHAVIOR';
 COMMENT ON TABLE  pattern_types   IS 'Detection pattern types master: regex, keyword, yaml_path, ...';
+
+COMMENT ON TABLE  dictionaries    IS 'Keyword dictionaries referenced by rules via type=dictionary ref';
+COMMENT ON COLUMN dictionaries.code IS 'Unique code referenced in rule detection_config';
+COMMENT ON COLUMN dictionaries.entries IS 'PostgreSQL TEXT[] array of keywords';
 
 COMMENT ON TABLE  rules           IS 'SDK built-in rules — seeded from JSON bundles';
 COMMENT ON COLUMN rules.id        IS 'Rule ID: I-01 ~ I-57, O-01 ~ O-53, SEC-01 ~ SEC-83';

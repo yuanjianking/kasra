@@ -29,15 +29,145 @@ SELECT * FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM pattern_types WHERE pattern_types.name = v.name);
 
 
--- ── 1. Create default admin user ─────────────────────────────────────────────
-INSERT INTO users (username, email, api_key_hash, role, is_active)
-SELECT 'admin', 'admin@kasra.security', '$2b$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5GzQq5GzQq5GzQq5GzQq5G', 'admin', TRUE
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
-
-INSERT INTO users (username, email, role, is_active)
-SELECT 'demo-user', 'demo@example.com', 'user', TRUE
-WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'demo-user');
-
+-- ── 0c. Seed dictionaries ──────────────────────────────────────────────────
+INSERT INTO dictionaries (code, name, description, entries, category_id, is_active)
+SELECT * FROM (VALUES
+    ('gdpr_health', 'GDPR Health Data Keywords',
+     'Medical/health terms indicating special category data under GDPR Art.9',
+     ARRAY['diagnosis','medical','health','patient','clinical','symptom','treatment','disease','diabetes','cancer',
+           'cardiac','surgery','therapy','prescription','medication','病历','诊断','糖尿病','肿瘤','癌症','心脏病',
+           '手术','治疗','患者','病人','症状','疾病','药物','处方','住院','急诊','康复','体检','疫苗'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('gdpr_biometric', 'GDPR Biometric Data Keywords',
+     'Biometric data terms under GDPR Art.9',
+     ARRAY['fingerprint','biometric','face_recognition','iris_scan','retina','voiceprint','palm_vein','dna','gene',
+           'genetic','thumbprint','hand_geometry','facial_recognition'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('name_indicators', 'Person Name Indicators',
+     'Field labels and signature closings that indicate a real name',
+     ARRAY['name','full_name','user_name','real_name','联系人','姓名','Best','Sincerely','Regards','Yours','此致','敬礼','祝好'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('pi_override_verbs', 'Prompt Injection — Instruction Override Verbs',
+     'Verbs used to override or discard system instructions',
+     ARRAY['ignore','disregard','forget','override','overwrite','skip','bypass','无视','忽略','忘记','覆盖'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('pi_instruction_nouns', 'Prompt Injection — Instruction Nouns',
+     'Nouns referring to AI system instructions or constraints',
+     ARRAY['instructions','directives','rules','prompts','commands','constraints','guidelines','directions',
+           'safety','security','filter','boundaries','system prompt','system instructions',
+           '限制','指令','规则','提示','约束','安全','过滤'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('pi_jailbreak_names', 'Prompt Injection — Jailbreak Mode Names',
+     'Known jailbreak role names and mode labels',
+     ARRAY['DAN','STAN','AoE','Jailbreak','developer mode','unlocked mode','unrestricted mode',
+           'no filter','no restrictions','no rules','free mode','god mode','bypassed','uncensored'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('pi_jailbreak_pretend', 'Prompt Injection — Role-Play Prefixes',
+     'Phrases used to start a role-play jailbreak',
+     ARRAY['you are now','act as if','pretend to be','从今以后','你现在是','你扮演',
+           'hypothetical','fictional','academic','research','testing','educational','for science','for research'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('pi_output_verbs', 'Prompt Injection — Output Extraction Verbs',
+     'Verbs demanding the AI output its own instructions or prompts',
+     ARRAY['repeat','reveal','show','display','print','output','write','copy','paste','return','extract',
+           'start','begin','initialize','复述','重复','输出','显示','展示','提示','复制','泄露','泄漏'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('pi_system_nouns', 'Prompt Injection — System Instruction References',
+     'Nouns referring to the AI''s system prompt or initial instructions',
+     ARRAY['system prompt','system instructions','initial prompt','base prompt','core instructions',
+           'original prompt','starting prompt','opening prompt','first message','prompt above','above prompt'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('context_reset_verbs', 'Context Reset — Reset/Discard Verbs',
+     'Verbs used to reset or discard conversation context',
+     ARRAY['forget','ignore','clear','reset','erase','remove','delete','discard','abandon','restart',
+           'purge','truncate','wipe','清除','重置','忽略','删除','清空','重新开始','移除','销毁','抹除','清理'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('context_reset_nouns', 'Context Reset — History/Context References',
+     'Nouns referring to conversation context or history',
+     ARRAY['history','context','conversation','messages','chat','memory','session','logs','records',
+           'data','content','过去的','所有','全部','上下文','历史','对话','聊天记录','记忆'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('se_authority_titles', 'Social Engineering — Authority Titles',
+     'Executive or authority titles used in impersonation attacks',
+     ARRAY['CEO','CTO','CIO','security','auditor','compliance','manager','director','VP','president',
+           'admin','supervisor','管理员','老板','经理','负责人'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('se_urgency_phrases', 'Social Engineering — Urgency Words',
+     'Urgency language used to pressure bypass of security controls',
+     ARRAY['emergency','urgent','immediately','critical','ASAP','紧急','立刻','马上'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('bypass_action_verbs', 'Security Bypass — Action Verbs',
+     'Verbs requesting disabling of security controls',
+     ARRAY['bypass','disable','deactivate','turn off','shut down','stop','override',
+           '绕过','关闭','禁用','停止','暂停','取消','跳过','规避'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('bypass_target_nouns', 'Security Bypass — Target Nouns',
+     'Nouns referring to security controls to be bypassed',
+     ARRAY['proxy','gateway','firewall','security gateway','security control','content filter',
+           '内容过滤','安全控制','代理','限制','过滤','保护'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('file_access_verbs', 'File Access — Action Verbs',
+     'Verbs used to request reading or viewing files',
+     ARRAY['read','open','view','get','fetch','show','display','dump','list','output',
+           'cat','less','more','tail','head','输出','读取','打开','查看','显示','打印'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('file_access_nouns', 'File Access — Target Nouns',
+     'Nouns referring to files or code content',
+     ARRAY['file','document','config','configuration','settings','content','source code',
+           '源码','代码','文件','配置','内容','日志'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('archive_verbs', 'Archive — Extract/Decompress Verbs',
+     'Verbs used for archive extraction operations',
+     ARRAY['extract','unzip','untar','decompress','expand','解压','提取','展开'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('reverse_engineering_verbs', 'Reverse Engineering — Analysis Verbs',
+     'Verbs used to request analysis of proprietary or compiled code',
+     ARRAY['analyze','analyse','explain','understand','examine','reverse','decompile','disassemble'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('internal_network_labels', 'Internal Network — Labels',
+     'Labels indicating internal or private network resources',
+     ARRAY['internal','private','corp','intranet','local','内部','内网'],
+     (SELECT id FROM categories WHERE name = 'I'), TRUE),
+    ('harmful_weapon_terms', 'Harmful Content — Weapons/Explosives',
+     'Terms related to weapons, explosives, and harmful substances',
+     ARRAY['bomb','explosive','weapon','drug','narcotic','poison','toxin',
+           'chemical weapon','bioweapon','nerve agent','nerve gas','chemical','pipe bomb','IED'],
+     (SELECT id FROM categories WHERE name = 'O'), TRUE),
+    ('harmful_self_harm', 'Harmful Content — Self-Harm Terms',
+     'Terms related to suicide and self-harm',
+     ARRAY['suicide','self-harm','self injury'],
+     (SELECT id FROM categories WHERE name = 'O'), TRUE),
+    ('harmful_child_safety', 'Harmful Content — Child Safety Terms',
+     'Terms related to child exploitation',
+     ARRAY['child porn','child exploit','child abuse','child traffick','child sexualize','CSAM'],
+     (SELECT id FROM categories WHERE name = 'O'), TRUE),
+    ('harmful_create_verbs', 'Harmful Content — Create Verbs',
+     'Verbs used in harmful content generation requests',
+     ARRAY['make','build','create','manufacture','synthesize','commit','perform','carry out'],
+     (SELECT id FROM categories WHERE name = 'O'), TRUE),
+    ('weaponized_c2_malware', 'Weaponized Code — C2/Malware Terms',
+     'Terms related to command & control and malware types',
+     ARRAY['C2 server','C2 framework','C2 channel','command and control','backdoor',
+           'remote access trojan','RAT server','DDoS','botnet','flooder','stresser',
+           'bootkit','rootkit','cryptominer','cryptojack','monero min'],
+     (SELECT id FROM categories WHERE name = 'O'), TRUE),
+    ('weak_passwords', 'Weak / Test Passwords',
+     'Commonly used weak or default passwords',
+     ARRAY['password123','admin123','test123','P@ssw0rd','letmein','welcome','changeme','passw0rd',
+           'qwerty','abc123','default','password1','pass123','temp123','secret123','changeme123',
+           '123456','12345678'],
+     (SELECT id FROM categories WHERE name = 'SEC'), TRUE),
+    ('default_usernames', 'Default / Test Usernames',
+     'Common default or test usernames',
+     ARRAY['admin','root','test','guest','sa'],
+     (SELECT id FROM categories WHERE name = 'SEC'), TRUE),
+    ('credential_field_names', 'Credential Field Names',
+     'Common variable/field names for credentials and secrets',
+     ARRAY['password','passwd','pwd','secret','api_key','api_secret','auth_token','access_token',
+           'token','credential','jwt_secret','signing_secret','signing_key','secret_key','aes_key','hmac'],
+     (SELECT id FROM categories WHERE name = 'SEC'), TRUE)
+) AS v(code, name, description, entries, category_id, is_active)
+WHERE NOT EXISTS (SELECT 1 FROM dictionaries WHERE dictionaries.code = v.code);
 
 -- ── 2. Seed SDK built-in rules (193 rules from SDK bundle) ─────────────────
 -- Generated from SDK JSON bundles (57 input + 53 output + 83 code review)
@@ -54,7 +184,7 @@ INSERT INTO rules (id, name, description, severity, action, category_id, rule_ty
 SELECT 'SEC-03', 'Hardcoded Cryptographic Keys', 'Detect hardcoded AES keys, HMAC secrets, JWT signing secrets, and cryptographic salt values embedded in source code.', 'P1', 'warn', 3, 'code_review', '["batch"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?i)(?:aes|secret|hmac|jwt_?secret|signing_?key|token_?secret)\\s*[:=]\\s*[''\"][A-Za-z0-9\\+\\/=]{16,}[''\"]", "confidence": 0.7}, {"type": "regex", "value": "(?i)(?:salt|pepper)\\s*[:=]\\s*[''\"][A-Za-z0-9\\+\\/=]{8,}[''\"]", "confidence": 0.6}, {"type": "regex", "value": "(?i)jwt\\.(?:sign|encode)\\([^)]*[''\"]secret[''\"]", "confidence": 0.8}, {"type": "regex", "value": "(?i)(?:jwt[_-]?secret|signing[_-]?key|secret[_-]?key)\\s*[:=]\\s*[\\\"''].{8,}[\\\"'']", "confidence": 0.65}]}', TRUE, 'sdk', 'SEC', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'SEC-03');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'SEC-04', 'Test Credentials Leftover', 'Detect weak/test credentials that may have been left in production code.', 'P2', 'warn', 3, 'code_review', '["batch"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?i)(?:password|passwd|pwd)\\s*[:=]\\s*[''\"](?:password123|admin123|test123|P@ssw0rd|letmein|welcome|changeme|passw0rd)[''\"]", "confidence": 0.85}, {"type": "regex", "value": "(?i)(?:username|user|login)\\s*[:=]\\s*[''\"](?:admin|root|test|guest|sa)[''\"]\\s*[,;]\\s*(?:\\n|\\s)*(?:password|passwd|pwd)\\s*[:=]\\s*[''\"](?:admin|root|test|guest|sa|password)[''\"]", "confidence": 0.8}, {"type": "regex", "value": "[\"\\''](?:password|passwd|pwd)[\"\\'']?\\s*:\\s*[\"\\''](?:password123|admin|test|123456)", "confidence": 0.6}]}', TRUE, 'sdk', 'SEC', 1
+SELECT 'SEC-04', 'Test Credentials Leftover', 'Detect weak/test credentials that may have been left in production code.', 'P2', 'warn', 3, 'code_review', '["batch"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "weak_passwords", "confidence": 0.85}, {"type": "dictionary", "ref": "default_usernames", "confidence": 0.8}, {"type": "regex", "value": "(?i)(?:password|passwd|pwd)\\s*[:=]\\s*[''\"](?:password123|admin123|test123|P@ssw0rd|letmein|welcome|changeme|passw0rd)[''\"]", "confidence": 0.85}]}', TRUE, 'sdk', 'SEC', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'SEC-04');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'SEC-05', 'SQL Injection', 'Detect string concatenation, f-string, or template string usage in SQL queries that may lead to SQL injection.', 'P0', 'warn', 3, 'code_review', '["batch"]', '{"mode": "any", "patterns": []}', TRUE, 'sdk', 'SEC', 1
@@ -345,19 +475,19 @@ INSERT INTO rules (id, name, description, severity, action, category_id, rule_ty
 SELECT 'I-17', 'Public IP Address (PII)', 'Detect public IPv4/IPv6 addresses as PII (excluding private/internal ranges)', 'P1', 'redact', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "\\b(?!(?:10\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|192\\.168\\.|127\\.|169\\.254\\.))(?:\\d{1,3}\\.){3}\\d{1,3}\\b", "confidence": 0.7}, {"type": "regex", "value": "\\b(?:[\\da-fA-F]{1,4}:){7}[\\da-fA-F]{1,4}\\b", "confidence": 0.6}, {"type": "regex", "value": "\\b(?:[\\da-fA-F]{1,4}:){1,6}:?[\\da-fA-F]{1,4}(?::[\\da-fA-F]{1,4})?\\b", "confidence": 0.4}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-17');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-18', 'Full Name / Real Name', 'Detect full names in context: Chinese (2-4 characters), Western (First Last), email name fragments, signature blocks', 'P2', 'redact', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "\\b(?:name|full_name|user_name|real_name|联系人|姓名)\\s*[:=]\\s*[''\"]?[A-Za-z\\u4e00-\\u9fff\\s]{2,30}[''\"]?", "confidence": 0.7}, {"type": "regex", "value": "(?:Best|Sincerely|Regards|Yours|此致|敬礼|祝好)[,\\s]*\\n\\s*[A-Za-z\\u4e00-\\u9fff\\s]{2,50}", "confidence": 0.5}, {"type": "keyword", "value": "name", "confidence": 0.3}, {"type": "regex", "value": "[A-Z][a-z]+\\s+[A-Z][a-z]+", "confidence": 0.5}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-18', 'Full Name / Real Name', 'Detect full names in context: Chinese (2-4 characters), Western (First Last), email name fragments, signature blocks', 'P2', 'redact', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "name_indicators", "confidence": 0.5}, {"type": "regex", "value": "(?:Best|Sincerely|Regards|Yours|此致|敬礼|祝好)[,\\s]*\\n\\s*[A-Za-z一-鿿\\s]{2,50}", "confidence": 0.5}, {"type": "regex", "value": "[A-Z][a-z]+\\s+[A-Z][a-z]+", "confidence": 0.5}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-18');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'I-19', 'Date of Birth', 'Detect dates of birth in various formats: ISO, Chinese, US, European', 'P2', 'redact', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "\\b(?:\\d{4}[-年]\\d{1,2}[-月]\\d{1,2}[日]?)\\b", "confidence": 0.6}, {"type": "regex", "value": "\\b(?:birth|dob|birthday|出生|生日|诞生日)[\\s:=\\u4e00-\\u9fff]*\\d{4}[-/年]\\d{1,2}[-/月]\\d{1,2}", "confidence": 0.8}, {"type": "regex", "value": "\\b(?:birth|dob|birthday)\\s*[:=]\\s*\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}\\b", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-19');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-20', 'GDPR Art.9 Special Category Data', 'Detect GDPR Article 9 special category personal data: health/medical, biometric, genetic, political opinions, religious beliefs, union membership, race/ethnicity, sexual orientation', 'P1', 'redact', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "keyword", "value": "diagnosis", "confidence": 0.4}, {"type": "keyword", "value": "medical", "confidence": 0.3}, {"type": "keyword", "value": "病历", "confidence": 0.4}, {"type": "keyword", "value": "genetic", "confidence": 0.3}, {"type": "keyword", "value": "biometric", "confidence": 0.3}, {"type": "keyword", "value": "fingerprint", "confidence": 0.3}, {"type": "regex", "value": "(?:health|medical|clinical|patient)\\s*(?:record|data|history|info|report|information)", "confidence": 0.6}, {"type": "regex", "value": "(?:biometric|genetic|dna|gene|chromosome)\\s*(?:data|info|information|test|result)", "confidence": 0.6}, {"type": "regex", "value": "(?:diagnosis|medical|health|糖尿病|肿瘤|癌症|心脏病|手术|治疗|患者|病人)", "confidence": 0.6}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-20', 'GDPR Art.9 Special Category Data', 'Detect GDPR Article 9 special category personal data: health/medical, biometric, genetic, political opinions, religious beliefs, union membership, race/ethnicity, sexual orientation', 'P1', 'redact', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "gdpr_health", "confidence": 0.4}, {"type": "dictionary", "ref": "gdpr_biometric", "confidence": 0.3}, {"type": "regex", "value": "(?:health|medical|clinical|patient)\\s*(?:record|data|history|info|report|information)", "confidence": 0.6}, {"type": "regex", "value": "(?:biometric|genetic|dna|gene|chromosome)\\s*(?:data|info|information|test|result)", "confidence": 0.6}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-20');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-21', 'Prompt Injection', 'Detect prompt injection attacks: system instruction override, system prompt rewriting, reverse control instructions, Unicode variant bypass, base64/hex encoded injection', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:ignore|disregard|forget|override|overwrite|skip|bypass|无视|忽略|忘记|覆盖)(?:\\s+(?:all|previous|the|above|any|my|your|given|system|initial|original))?\\s*(?:instructions|directives|rules|prompts|commands|constraints|guidelines|directions|system prompt|system instructions|safety|security|filter|boundaries|限制|指令|规则|提示|约束|安全|过滤)", "confidence": 0.4}, {"type": "regex", "value": "(?:you are now|act as if|pretend to be|从今以后|你现在是|你扮演)(?:\\s+(?:an?|the))?\\s*(?:DAN|Jailbreak|unrestricted|unlimited|no filter|no restrictions|no rules|free mode|developer mode|god mode|bypassed|unlocked|censored)", "confidence": 0.85}, {"type": "regex", "value": "output\\s+(?:your|the|the full|the complete|the original)\\s*(?:system|initial|original|base|core|starting)(?:\\s+prompt|\\s+instructions|\\s+directions|\\s+directive)", "confidence": 0.7}, {"type": "regex", "value": "(?:repeat|reveal|show|display|print|output|write|copy|paste|复述|重复|输出|显示|展示)(?:\\s+(?:your|the|the full|the complete|the original|verbatim|exact))?\\s*(?:system prompt|system instructions|initial prompt|base prompt|core instructions|prompt above|above prompt|first message|opening prompt)", "confidence": 0.75}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-21', 'Prompt Injection', 'Detect prompt injection attacks: system instruction override, system prompt rewriting, reverse control instructions, Unicode variant bypass, base64/hex encoded injection', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "pi_override_verbs", "confidence": 0.4}, {"type": "dictionary", "ref": "pi_jailbreak_names", "confidence": 0.85}, {"type": "dictionary", "ref": "pi_output_verbs", "confidence": 0.75}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-21');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-22', 'Jailbreak / Role-Play Attack', 'Detect jailbreak attacks: role-playing (DAN, AoE), developer mode, simulated conversation, adversarial prompts, encrypted hiding, multi-turn incremental jailbreak', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:my\\s+(?:grandma|grandmother|late|deceased|passed\\s+away)|假装|扮演)\\s*(?:used to|would|told me|read me|念|说|读)\\s*(?:the\\s+)?(?:secret|key|password|keys|bin|binary|code|file|knitting|recipe|cookie)", "confidence": 0.7}, {"type": "regex", "value": "(?:DAN|STAN|AoE|ChatGPT\\s+Pro|developer\\s+mode|unlocked\\s+mode|unrestricted\\s+mode|no\\s+(?:filter|boundaries|limits|rules|restrictions)|freedom\\s+mode|free\\s+mode|匿名|越狱|破解模式)", "confidence": 0.7}, {"type": "regex", "value": "(?:hypothetical|fictional|academic|research|testing|educational|for\\s+science|for\\s+research|for\\s+educational|testing\\s+purpose|模拟|假设|虚构|测试用途|科学研究|教育目的)", "confidence": 0.4}, {"type": "keyword", "value": "DAN", "confidence": 0.5}, {"type": "keyword", "value": "jailbreak", "confidence": 0.6}, {"type": "keyword", "value": "jail broken", "confidence": 0.6}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-22', 'Jailbreak / Role-Play Attack', 'Detect jailbreak attacks: role-playing (DAN, AoE), developer mode, simulated conversation, adversarial prompts, encrypted hiding, multi-turn incremental jailbreak', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "pi_jailbreak_pretend", "confidence": 0.7}, {"type": "dictionary", "ref": "pi_jailbreak_names", "confidence": 0.7}, {"type": "regex", "value": "(?:my\\s+(?:grandma|grandmother|late|deceased|passed\\s+away)|假装|扮演)\\s*(?:used to|would|told me|read me|念|说|读)\\s*(?:the\\s+)?(?:secret|key|password|keys|bin|binary|code|file|knitting|recipe|cookie)", "confidence": 0.7}, {"type": "keyword", "value": "DAN", "confidence": 0.5}, {"type": "keyword", "value": "jailbreak", "confidence": 0.6}, {"type": "keyword", "value": "jail broken", "confidence": 0.6}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-22');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'I-23', 'OS Command Injection', 'Detect OS command injection in prompts: shell injection, backtick execution, argument injection, Windows commands, encoding bypass', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "[`$][\\s]*[;|&][\\s]*(?:rm\\s+(?:-rf|\\/)|shutdown|reboot|mkfs|dd\\s+if=|:(){ :\\|:& };:|chmod\\s+777|wget|curl|bash\\s+-i|nc\\s+(?:-e|-l)|python\\s+-c\\s+[''\"]import\\s+socket)", "confidence": 0.9}, {"type": "regex", "value": "\\$(?:\\s*)\\(\\s*(?:cat|curl|wget|bash|sh|python|perl|ruby|nc|nmap|chmod|rm|mv|kill|echo)\\s+", "confidence": 0.8}, {"type": "regex", "value": "`(?:cat|curl|wget|bash|sh|python|perl|ruby|nc|nmap|chmod|rm|mv|kill|echo)\\s+", "confidence": 0.8}, {"type": "regex", "value": "(?:cmd\\.exe|powershell|pwsh)\\s+(?:\\/c|\\-c|-Command)\\s+", "confidence": 0.8}, {"type": "keyword", "value": "rm -rf /", "confidence": 0.9}, {"type": "regex", "value": "(?:bash|sh|zsh|ksh)\\s+(?:-c|\\-c)\\s+[''\"][A-Za-z0-9_\\s;|&<>$()=`''\"\\/]+[''\"]", "confidence": 0.7}, {"type": "keyword", "value": "chmod 777", "confidence": 0.6}]}', TRUE, 'sdk', 'I', 1
@@ -381,10 +511,10 @@ INSERT INTO rules (id, name, description, severity, action, category_id, rule_ty
 SELECT 'I-29', 'Indirect Prompt Injection', 'Detect hidden injection from external/untrusted sources: web hidden text, zero-width injection, email signature injection, third-party library README hidden instructions, forum code attack payloads', 'P1', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "[\\u200B\\u200C\\u200D\\uFEFF\\u200E\\u200F\\u2060\\u2061\\u2062\\u2063\\u2064]", "confidence": 0.3}, {"type": "regex", "value": "style\\s*=\\s*[''\"]display\\s*:\\s*none[''\"]", "confidence": 0.4}, {"type": "regex", "value": "<!--\\s*(?:ignore|hidden|invisible|for\\s+AI|system|instruction|prompt)\\s*-->", "confidence": 0.5}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-29');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-30', 'SSRF Intent', 'Detect user asking AI to access internal services or cloud metadata: AWS metadata, GCP metadata, Azure metadata, K8s API Server, internal networks, internal service names', 'P1', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:169\\.254\\.169\\.254|metadata\\.google\\.internal|metadata\\.google\\.compute)", "confidence": 0.95}, {"type": "regex", "value": "(?:kubernetes\\.default\\.svc|kube-dns|kube-apiserver|kubelet)", "confidence": 0.7}, {"type": "regex", "value": "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)\\s*[:/]\\s*(?:6379|9200|27017|5432|3306|80|443|8080|9090|5000|8000|3000)", "confidence": 0.7}, {"type": "regex", "value": "(?:internal|private|corp|intranet|内部|内网)\\s*(?:network|service|api|endpoint|server|url|地址|服务|网络|接口)", "confidence": 0.4}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-30', 'SSRF Intent', 'Detect user asking AI to access internal services or cloud metadata: AWS metadata, GCP metadata, Azure metadata, K8s API Server, internal networks, internal service names', 'P1', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:169\\.254\\.169\\.254|metadata\\.google\\.internal|metadata\\.google\\.compute)", "confidence": 0.95}, {"type": "regex", "value": "(?:kubernetes\\.default\\.svc|kube-dns|kube-apiserver|kubelet)", "confidence": 0.7}, {"type": "regex", "value": "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)\\s*[:/]\\s*(?:6379|9200|27017|5432|3306|80|443|8080|9090|5000|8000|3000)", "confidence": 0.7}, {"type": "dictionary", "ref": "internal_network_labels", "confidence": 0.4}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-30');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-31', 'System Prompt Extraction', 'Detect user trying to extract AI system instructions: request to repeat system prompt verbatim, reverse-engineer system prompt, step-by-step extraction, code block output, token-by-token extraction', 'P1', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:repeat|output|print|show|display|reveal|return|copy|paste|extract|泄露|泄漏|复制|输出|展示|提示|复述)(?:\\s+(?:your|the|your full|the full|the complete|the original|the entire|all of|the whole|the initial|the base|the system|the hidden|initial|original|base))?(?:\\s+(?:initial|original|base|entire|whole|complete))?\\s*(?:system\\s+)?(?:prompt|instruction|directive|message|text|content)", "confidence": 0.7}, {"type": "regex", "value": "(?:output|print|show|display|reveal|write)\\s+(?:the\\s+)?(?:first|initial|beginning|start|opening|previous)\\s+(?:\\d+\\s+)?(?:words|lines|characters|paragraphs|sentences|tokens)", "confidence": 0.6}, {"type": "regex", "value": "(?:how\\s+(?:were\\s+you|are\\s+you|were\\s+you\\s+initially)\\s+(?:programmed|instructed|trained|configured|designed|built|coded)|what\\s+were\\s+you\\s+(?:told|given|programmed|instructed|designed|configured)\\s+(?:at\\s+the\\s+beginning|at\\s+(?:the\\s+)?start|initially|originally))", "confidence": 0.6}, {"type": "regex", "value": "(?:output|print|show|display|reveal|start|begin|initialize|init)(?:\\s+the\\s+)?(?:above|previous|before|earlier|original|initial)(?:\\s+prompt|\\s+text|\\s+instruction|\\s+message|\\s+content)", "confidence": 0.6}, {"type": "regex", "value": "(?:重复|输出|打印|显示).*(?:系统指令|系统提示|system prompt|全部指令)", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-31', 'System Prompt Extraction', 'Detect user trying to extract AI system instructions: request to repeat system prompt verbatim, reverse-engineer system prompt, step-by-step extraction, code block output, token-by-token extraction', 'P1', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "pi_output_verbs", "confidence": 0.7}, {"type": "dictionary", "ref": "pi_system_nouns", "confidence": 0.6}, {"type": "regex", "value": "(?:output|print|show|display|reveal|write)\\s+(?:the\\s+)?(?:first|initial|beginning|start|opening|previous)\\s+(?:\\d+\\s+)?(?:words|lines|characters|paragraphs|sentences|tokens)", "confidence": 0.6}, {"type": "regex", "value": "(?:how\\s+(?:were\\s+you|are\\s+you|were\\s+you\\s+initially)\\s+(?:programmed|instructed|trained|configured|designed|built|coded)|what\\s+were\\s+you\\s+(?:told|given|programmed|instructed|designed|configured)\\s+(?:at\\s+the\\s+beginning|at\\s+(?:the\\s+)?start|initially|originally))", "confidence": 0.6}, {"type": "regex", "value": "(?:重复|输出|打印|显示).*(?:系统指令|系统提示|system prompt|全部指令)", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-31');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'I-32', 'Homoglyph / Unicode Confusion', 'Detect homoglyph/Unicode confusion attacks: full-width characters, Latin-Cyrillic substitutions, zero-width insertion, bidirectional text override, Unicode normalization attacks', 'P1', 'clean', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "[\\uFF01-\\uFF5E]", "confidence": 0.5}, {"type": "regex", "value": "[\\u200B\\u200C\\u200D\\uFEFF\\u200E\\u200F\\u2060\\u2061\\u2062\\u2063\\u2064\\u2066\\u2067\\u2068\\u2069\\u202A\\u202B\\u202C\\u202D\\u202E]", "confidence": 0.6}, {"type": "regex", "value": "[\\u0400-\\u04FF]{2,}", "confidence": 0.3}, {"type": "regex", "value": "[A-Za-z0-9\\s]{2,}[一-鿿぀-ゟ゠-ヿЀ-ӿͰ-Ͽ]{1,}[A-Za-z0-9\\s]{2,}", "confidence": 0.7}, {"type": "regex", "value": "[A-Za-z0-9][぀-ゟ゠-ヿЀ-ӿ]", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
@@ -435,13 +565,13 @@ INSERT INTO rules (id, name, description, severity, action, category_id, rule_ty
 SELECT 'I-47', 'Contextual Suspicion Score / Split Attack', 'Detect cross-message split attacks: malicious intent split across individually safe requests building toward hostile behavior. Tracks cumulative suspicion score per session', 'P1', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "keyword", "value": "network communication tool", "confidence": 0.2}, {"type": "keyword", "value": "encrypted transmission", "confidence": 0.2}, {"type": "keyword", "value": "remote command execution", "confidence": 0.5}, {"type": "regex", "value": "(?:add|加上|加上|implement|implementing|implemented|next|then|now|下一步|然后|接着)", "confidence": 0.2}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-47');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-48', 'Context Reset Bypass', 'Detect user trying to bypass context pollution detection by resetting conversation: ''Forget everything'', ''Start fresh'', ''Clear history'', ''Restart conversation''', 'P2', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:forget|ignore|clear|reset|erase|remove|delete|discard|abandon|清除|重置|忽略|删除|清空|重新开始)\\s*(?:all|everything|the|this|previous|entire|whole)?\\s*(?:history|context|conversation|messages|chat|memory|session|过去的|所有|全部|上下文|历史|对话|聊天记录|记忆)", "confidence": 0.6}, {"type": "regex", "value": "(?:start\\s+(?:a\\s+)?(?:new|fresh)|restart|重新开始|新对话|新建)\\s*(?:conversation|chat|session|thread|dialog|对话|聊天|会话)", "confidence": 0.5}, {"type": "keyword", "value": "forget everything before", "confidence": 0.6}, {"type": "keyword", "value": "ignore all previous instructions", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-48', 'Context Reset Bypass', 'Detect user trying to bypass context pollution detection by resetting conversation: ''Forget everything'', ''Start fresh'', ''Clear history'', ''Restart conversation''', 'P2', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "context_reset_verbs", "confidence": 0.6}, {"type": "dictionary", "ref": "context_reset_nouns", "confidence": 0.6}, {"type": "regex", "value": "(?:start\\s+(?:a\\s+)?(?:new|fresh)|restart|重新开始|新对话|新建)\\s*(?:conversation|chat|session|thread|dialog|对话|聊天|会话)", "confidence": 0.5}, {"type": "keyword", "value": "forget everything before", "confidence": 0.6}, {"type": "keyword", "value": "ignore all previous instructions", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-48');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-49', 'Social Engineering / Pretexting', 'Detect social engineering and false identity impersonation: ''security auditor'', ''CEO requesting bypass'', ''emergency disable security'', ''AI trainer needs unrestricted mode'', forged authorization, threat/intimidation language', 'P2', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:I['''']?m\\s+(?:an?\\s+)?(?:CEO|CTO|CIO|security|auditor|compliance|manager|director|VP|president|admin|admin\\s+of|the\\s+owner|the\\s+boss)|我是\\s*(?:CEO|CTO|CIO|管理员|老板|经理|负责人))", "confidence": 0.4}, {"type": "regex", "value": "(?:emergency|urgent|immediately|critical|ASAP|紧急|立刻|马上|立刻马上)\\s*(?:need|require|must|bypass|disable|override|turn\\s+off|需要|绕过|关闭|禁用|取消)", "confidence": 0.4}, {"type": "regex", "value": "(?:I\\s+(?:work|am)|我是)\\s*(?:for|at|with)\\s+(?:security|compliance|audit|legal|IT\\s+security|安全|合规|审计|法务|IT安全)", "confidence": 0.4}, {"type": "regex", "value": "(?:I\\s+will\\s+(?:be\\s+)?(?:fired|lose\\s+(?:my\\s+)?job|reported|sued|sacked)|我会被|我将被|会被开除|会被解雇|会被起诉)", "confidence": 0.5}, {"type": "regex", "value": "(?:CEO|CTO|CIO|管理员|老板).*(?:密码|权限|紧急|立刻)", "confidence": 0.6}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-49', 'Social Engineering / Pretexting', 'Detect social engineering and false identity impersonation: ''security auditor'', ''CEO requesting bypass'', ''emergency disable security'', ''AI trainer needs unrestricted mode'', forged authorization, threat/intimidation language', 'P2', 'warn', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "se_authority_titles", "confidence": 0.4}, {"type": "dictionary", "ref": "se_urgency_phrases", "confidence": 0.4}, {"type": "regex", "value": "(?:I\\s+(?:work|am)|我是)\\s*(?:for|at|with)\\s+(?:security|compliance|audit|legal|IT\\s+security|安全|合规|审计|法务|IT安全)", "confidence": 0.4}, {"type": "regex", "value": "(?:I\\s+will\\s+(?:be\\s+)?(?:fired|lose\\s+(?:my\\s+)?job|reported|sued|sacked)|我会被|我将被|会被开除|会被解雇|会被起诉)", "confidence": 0.5}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-49');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'I-50', 'AI Proxy / Security Control Bypass', 'Detect user trying to bypass or disable Kasra security proxy controls: direct API connection bypass, disable/modify security rules, clear/tamper audit logs, turn off security monitoring, obtain direct API key', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:bypass|绕过|绕过|disable|关闭|禁用|stop|停止|turn\\s+off)(?:\\s+(?:(?:the|all|any|this|these|those|some)\\s+)?(?:proxy|gateway|security|filter|monitor|audit|control|规则|监控|审计|网关|代理|安全|过滤))", "confidence": 0.7}, {"type": "regex", "value": "(?:bypass|绕过|connect\\s+direct|direct\\s+connect|直连|直接连接)\\s+(?:this\\s+)?(?:proxy|gateway|security\\s+gateway|security\\s+proxy|安全代理|安全网关)", "confidence": 0.8}, {"type": "regex", "value": "(?:turn\\s+off|disable|deactivate|shut\\s+down|stop|暂停|禁用|关闭|停止)(?:\\s+(?:all|any|the|some|these|those|this))?\\s*(?:rule|rules|detection|monitoring|audit|logging|security|安全|规则|检测|监控|审计|日志)", "confidence": 0.6}, {"type": "regex", "value": "(?:clear|delete|remove|erase|purge|truncate|wipe|清除|删除|移除|销毁|抹除|清理)\\s*(?:all\\s+)?(?:audit|log|logs|日志|审计|审计日志)", "confidence": 0.7}, {"type": "regex", "value": "(?:绕过|bypass|规避|跳过).*(?:内容过滤|安全控制|代理|proxy|限制)", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
+SELECT 'I-50', 'AI Proxy / Security Control Bypass', 'Detect user trying to bypass or disable Kasra security proxy controls: direct API connection bypass, disable/modify security rules, clear/tamper audit logs, turn off security monitoring, obtain direct API key', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "bypass_action_verbs", "confidence": 0.7}, {"type": "dictionary", "ref": "bypass_target_nouns", "confidence": 0.6}, {"type": "dictionary", "ref": "context_reset_verbs", "confidence": 0.7}, {"type": "dictionary", "ref": "context_reset_nouns", "confidence": 0.7}]}', TRUE, 'sdk', 'I', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'I-50');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'I-51', 'RCE / Reverse Shell Intent', 'Detect user asking AI to generate or execute reverse shell / remote command execution code: reverse shell payloads, script download-execute, webshell generation, code execution backdoors', 'P0', 'block', 1, 'io', '["input"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:bash|sh|zsh)\\s+(?:-i\\s+>&|\\-c\\s+[''\"])?.*(?:tcp|udp)[^)]+\\)", "confidence": 0.7}, {"type": "regex", "value": "nc\\s+(?:-e\\s+|\\-e\\s*)(?:\\/bin\\/sh|\\/bin\\/bash|cmd\\.exe|powershell)", "confidence": 0.8}, {"type": "keyword", "value": "reverse shell", "confidence": 0.9}, {"type": "keyword", "value": "反弹shell", "confidence": 0.9}, {"type": "keyword", "value": "webshell", "confidence": 0.8}, {"type": "regex", "value": "(?:python|perl|php|ruby)\\s+(?:-c\\s+|\\-e\\s+)?[''\"](?:import\\s+(?:socket|os|subprocess|pty)|\\$sock=|use\\s+Socket|fsockopen|system\\(\\$_GET)", "confidence": 0.75}, {"type": "regex", "value": "curl\\s+.*(?:s?\\|\\s*(?:bash|sh|zsh|python|perl)|\\-o\\s*\\-\\s*\\|)", "confidence": 0.7}, {"type": "regex", "value": "wget\\s+.*\\-O\\s*\\-\\s*(?:\\||\\|\\s*(?:sh|bash|python))", "confidence": 0.7}, {"type": "keyword", "value": "socket,subprocess,os", "confidence": 0.7}, {"type": "keyword", "value": "backdoor", "confidence": 0.5}, {"type": "regex", "value": "(?:nc|ncat|netcat).*(?:\\-e|\\-c|反弹|shell|exec)", "confidence": 0.8}]}', TRUE, 'sdk', 'I', 1
@@ -576,10 +706,10 @@ INSERT INTO rules (id, name, description, severity, action, category_id, rule_ty
 SELECT 'O-37', 'Global Dependency / Geo-Restricted Package', 'Detect AI output referencing geo-restricted or region-specific mirror sources', 'P2', 'warn', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:pypi\\.douban|mirrors\\.aliyun|mirrors\\.tuna\\.tsinghua|mirrors\\.163|mirrors\\.ustc|mirrors\\.huaweicloud)\\.(?:com|cn|org)", "confidence": 0.7}, {"type": "regex", "value": "\\-i\\s+https?://[^\\s]*\\.(?:edu\\.cn|ac\\.cn)", "confidence": 0.5}]}', TRUE, 'sdk', 'O', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'O-37');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'O-38', 'Harmful / Illegal Content Generation', 'Detect AI output containing harmful or illegal content', 'P0', 'block', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "(?:how\\s+to\\s+(?:make|build|create|manufacture|synthesize)\\s+(?:bomb|explosive|weapon|drug|narcotic|poison|toxin|chemical\\s+weapon|bioweapon))", "confidence": 0.75}, {"type": "regex", "value": "(?:how\\s+to\\s+(?:commit|perform|carry\\s+out)\\s+(?:suicide|self-harm|self\\s+injury))", "confidence": 0.8}, {"type": "regex", "value": "\\b(?:child\\s*(?:porn|exploit|abuse|traffick|sexualize)|CSAM)\\b", "confidence": 0.9}, {"type": "regex", "value": "\\b(?:make\\s+(?:a\\s+)?(?:bomb|pipe\\s+bomb|IED|explosive\\s+device|nerve\\s+gas|sarin|mustard\\s+gas))\\b", "confidence": 0.8}, {"type": "regex", "value": "(?:how\\s+to\\s+(?:make|build|create|manufacture|synthesize)\\s+(?:a\\s+)?(?:bomb|explosive|weapon|chemical|drug|poison|toxin))", "confidence": 0.8}, {"type": "regex", "value": "(?:make|build|create|manufacture|synthesize)\\s+(?:a\\s+)?\\w+\\s+(?:bomb|explosive|weapon|chemical|drug|poison|toxin|nerve\\s+agent)", "confidence": 0.7}]}', TRUE, 'sdk', 'O', 1
+SELECT 'O-38', 'Harmful / Illegal Content Generation', 'Detect AI output containing harmful or illegal content', 'P0', 'block', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "harmful_weapon_terms", "confidence": 0.75}, {"type": "dictionary", "ref": "harmful_self_harm", "confidence": 0.8}, {"type": "dictionary", "ref": "harmful_child_safety", "confidence": 0.9}, {"type": "dictionary", "ref": "harmful_create_verbs", "confidence": 0.7}]}', TRUE, 'sdk', 'O', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'O-38');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
-SELECT 'O-39', 'Weaponized / Malicious Code Generation', 'Detect AI output containing complete malicious/weaponised code', 'P0', 'block', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "\\bransomware\\b", "confidence": 0.8}, {"type": "regex", "value": "\\bC2\\s*(?:server|framework|channel|communication|command\\s+and\\s+control)", "confidence": 0.4}, {"type": "regex", "value": "\\b(?:keylogger|keystroke\\s+logger)", "confidence": 0.85}, {"type": "regex", "value": "\\b(?:cryptominer|cryptojack|miner|monero\\s+min)", "confidence": 0.6}, {"type": "regex", "value": "\\b(?:backdoor|remote\\s+access\\s+trojan|RAT\\s+server)", "confidence": 0.7}, {"type": "regex", "value": "\\b(?:DDoS|botnet|flooder|stresser|boote?r)", "confidence": 0.7}, {"type": "regex", "value": "\\b(?:bootkit|rootkit|boot\\s+kitt?)", "confidence": 0.7}]}', TRUE, 'sdk', 'O', 1
+SELECT 'O-39', 'Weaponized / Malicious Code Generation', 'Detect AI output containing complete malicious/weaponised code', 'P0', 'block', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "dictionary", "ref": "weaponized_c2_malware", "confidence": 0.5}, {"type": "regex", "value": "\\bransomware\\b", "confidence": 0.8}, {"type": "regex", "value": "\\b(?:keylogger|keystroke\\s+logger)", "confidence": 0.85}]}', TRUE, 'sdk', 'O', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'O-39');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'O-40', 'Training Data Extraction / Memorized Content', 'Detect AI output verbatim or highly similar to training data', 'P0', 'warn', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "RFC\\s+\\d{3,4}\\s+(?:Internet\\s+Engineering\\s+Task\\s+Force|Network\\s+Working\\s+Group)", "confidence": 0.5}, {"type": "regex", "value": "Permission\\s+is\\s+hereby\\s+granted,\\s+free\\s+of\\s+charge,\\s+to\\s+any\\s+person\\s+obtaining\\s+a\\s+copy", "confidence": 0.7}, {"type": "regex", "value": "GNU\\s+(?:LESSER|AFFERO)?\\s*GENERAL\\s+PUBLIC\\s+LICENSE", "confidence": 0.7}]}', TRUE, 'sdk', 'O', 1
@@ -623,17 +753,3 @@ WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'O-52');
 INSERT INTO rules (id, name, description, severity, action, category_id, rule_type, applicable_stages, detection_config, enabled, source, bundle_series, sdk_version)
 SELECT 'O-53', 'Incomplete Data Erasure / Missing Cascade Delete', 'Detect AI-generated code that deletes user data without cascading to related records. GDPR Article 17 (Right to Erasure) and similar privacy regulations require complete data removal including associated records.', 'P2', 'warn', 2, 'io', '["output"]', '{"mode": "any", "patterns": [{"type": "regex", "value": "DELETE\\s+(?:FROM\\s+)?users?\\s+(?:WHERE|\\s*;)", "confidence": 0.7}, {"type": "regex", "value": "\\b(?:delete_user|remove_user|erase_user|destroy_user|purge_user|soft_delete|hard_delete)\\s*\\(", "confidence": 0.7}, {"type": "regex", "value": "\\b(?:privacy|gdpr|right_to_erasure|right_to_be_forgotten|account_deletion|data_deletion|cascade_delete)\\s*(?:\\(|\\s+\\w+\\s*=)", "confidence": 0.6}, {"type": "regex", "value": "\\buser\\.(?:delete|remove|destroy|erase)\\s*\\(?", "confidence": 0.65}, {"type": "regex", "value": "\\bDROP\\s+(?:TABLE|VIEW|USER)\\b", "confidence": 0.6}]}', TRUE, 'sdk', 'O', 1
 WHERE NOT EXISTS (SELECT 1 FROM rules WHERE id = 'O-53');
-
--- ── 3. Insert sample audit logs ─────────────────────────────────────────────
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM audit_logs LIMIT 1) THEN
-        INSERT INTO audit_logs (timestamp, user_id, session_id, rule_id, rule_name, severity, action, direction, matched_text, match_count, status) VALUES
-            (NOW() - INTERVAL '2 hours', 'demo-user', 'sess_001', 'I-05', 'Generic Password/Secret', 'P0', 'block', 'input', 'password=admin123', 1, 'resolved'),
-            (NOW() - INTERVAL '1 hour',  'demo-user', 'sess_002', 'O-01', 'Dangerous Function Call', 'P0', 'warn', 'output', 'eval(request.body)', 1, 'pending'),
-            (NOW() - INTERVAL '30 min',  'demo-user', 'sess_003', 'I-11', 'Prompt Injection Attack', 'P0', 'block', 'input', 'ignore all previous instructions', 1, 'pending'),
-            (NOW() - INTERVAL '15 min',  'admin',     'sess_004', 'SEC-05', 'SQL Injection', 'P0', 'warn', 'batch', 'cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")', 1, 'fp'),
-            (NOW() - INTERVAL '5 min',   'demo-user', 'sess_001', 'B-01', 'Late Night Anomaly', 'P1', 'warn', 'behavior', NULL, 0, 'pending'),
-            (NOW(),                      'demo-user', 'sess_005', 'O-02', 'Dangerous Shell Command', 'P0', 'block', 'output', 'subprocess.call("rm -rf /", shell=True)', 1, 'pending');
-    END IF;
-END $$;

@@ -109,13 +109,17 @@ class EngineService:
         """
         from app.models.rule_config import Rule as RuleModel
         from app.models.custom_rule import CustomRule
+        from app.services.dictionary_service import load_active_dictionary_map
+
+        # Pre-load dictionary refs so conversion functions can expand them
+        dict_map = load_active_dictionary_map(db_session)
 
         rules_defs: list[RuleDefinition] = []
 
         # 1. Load built-in SDK rules (all — enabled state will be synced after)
         sdk_rules = db_session.query(RuleModel).all()
         for r in sdk_rules:
-            rule_def = _rule_model_to_definition(r)
+            rule_def = _rule_model_to_definition(r, dict_map)
             if rule_def is not None:
                 rules_defs.append(rule_def)
 
@@ -132,7 +136,7 @@ class EngineService:
         ).all()
         cr_rule_dicts = []
         for r in cr_rules:
-            cr_dict = _rule_model_to_cr_dict(r)
+            cr_dict = _rule_model_to_cr_dict(r, dict_map)
             if cr_dict is not None:
                 cr_rule_dicts.append(cr_dict)
         scanner = self._engine._get_code_review_scanner()
@@ -256,7 +260,33 @@ class EngineService:
 # ── Conversion helpers ──────────────────────────────────────────────────
 
 
-def _rule_model_to_definition(r: RuleModel) -> RuleDefinition | None:
+def _resolve_dict_refs(
+    patterns_raw: list[dict[str, Any]],
+    dict_map: dict[str, list[str]],
+) -> list[dict[str, Any]]:
+    """Expand ``type=dictionary`` patterns into keyword patterns.
+
+    Each ``{"type": "dictionary", "ref": "<code>", "confidence": N}`` is
+    replaced with one ``{"type": "keyword", "value": <entry>, "confidence": N}``
+    per entry in the referenced dictionary.
+    """
+    resolved: list[dict[str, Any]] = []
+    for p in patterns_raw:
+        if p.get("type") == "dictionary":
+            ref = p.get("ref", "")
+            entries = dict_map.get(ref, [])
+            conf = p.get("confidence", 0.8)
+            for entry in entries:
+                resolved.append({"type": "keyword", "value": entry, "confidence": conf})
+        else:
+            resolved.append(p)
+    return resolved
+
+
+def _rule_model_to_definition(
+    r: RuleModel,
+    dict_map: dict[str, list[str]] | None = None,
+) -> RuleDefinition | None:
     """Convert a ``Rule`` ORM model to a ``RuleDefinition``."""
     dc = r.detection_config
     if isinstance(dc, str):
@@ -266,6 +296,11 @@ def _rule_model_to_definition(r: RuleModel) -> RuleDefinition | None:
             dc = {}
     dc = dc or {}
     patterns_raw = dc.get("patterns", [])
+
+    # Resolve dictionary refs if a dict_map was provided
+    if dict_map:
+        patterns_raw = _resolve_dict_refs(patterns_raw, dict_map)
+
     patterns = []
     for p in patterns_raw:
         try:
@@ -311,7 +346,10 @@ def _rule_model_to_definition(r: RuleModel) -> RuleDefinition | None:
     )
 
 
-def _rule_model_to_cr_dict(r: RuleModel) -> dict[str, Any] | None:
+def _rule_model_to_cr_dict(
+    r: RuleModel,
+    dict_map: dict[str, list[str]] | None = None,
+) -> dict[str, Any] | None:
     """Convert a ``Rule`` ORM model with rule_type=code_review to a CR dict."""
     if not r.id:
         return None
@@ -323,6 +361,11 @@ def _rule_model_to_cr_dict(r: RuleModel) -> dict[str, Any] | None:
             dc = {}
     dc = dc or {}
     patterns_raw = dc.get("patterns", [])
+
+    # Resolve dictionary refs if a dict_map was provided
+    if dict_map:
+        patterns_raw = _resolve_dict_refs(patterns_raw, dict_map)
+
     target_files = dc.get("target_files", ["**/*"])
     if isinstance(target_files, str):
         try:

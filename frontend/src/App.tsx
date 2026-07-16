@@ -13,6 +13,7 @@ const ScanConsole = lazy(() => import('./pages/ScanConsole'))
 const ComplianceReport = lazy(() => import('./pages/ComplianceReport'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Categories = lazy(() => import('./pages/Categories'))
+const Dictionaries = lazy(() => import('./pages/Dictionaries'))
 
 function LoadingSkeleton() {
   return (
@@ -36,6 +37,7 @@ const navItems = [
   { path: '/reports', label: 'Reports', icon: '📈' },
   { path: '/user-behavior', label: 'Users', icon: '👤' },
   { path: '/categories', label: 'Categories', icon: '📁' },
+  { path: '/dictionaries', label: 'Dictionaries', icon: '📖' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
@@ -131,6 +133,7 @@ function AppContent() {
               <Route path="/reports" element={<ComplianceReport />} />
               <Route path="/user-behavior" element={<UserBehavior />} />
               <Route path="/categories" element={<Categories />} />
+              <Route path="/dictionaries" element={<Dictionaries />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </Suspense>
