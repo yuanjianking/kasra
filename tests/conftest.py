@@ -1,19 +1,27 @@
-"""Test fixtures for Kasra App tests."""
+"""Test fixtures for Kasra App tests.
+
+Uses PostgreSQL via a dedicated test database.
+Run: createdb kasra_test  (or let docker-compose tests manage it)
+"""
 from __future__ import annotations
 
+import json
 import logging
 import os
-import tempfile
+from pathlib import Path
 from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
 
-# Create a temporary database file for testing
-_test_db_fd, _test_db_path = tempfile.mkstemp(suffix="_kasra_test.db")
+# PostgreSQL test database — requires PostgreSQL to be running.
+# Override with KASRA_TEST_DATABASE_URL env var if needed.
+_test_db_url = os.environ.get(
+    "KASRA_TEST_DATABASE_URL",
+    "postgresql+psycopg2://kasra:kasra-dev-password@localhost:5432/kasra_test",
+)
 
-# Override settings for testing BEFORE importing app modules
-os.environ["KASRA_APP_DATABASE_URL"] = f"sqlite:///{_test_db_path}"
+os.environ["KASRA_APP_DATABASE_URL"] = _test_db_url
 os.environ["KASRA_APP_API_KEY"] = "test-api-key"
 os.environ["KASRA_APP_SEED_DATA"] = "false"
 os.environ["KASRA_SKIP_FRONTEND"] = "true"
@@ -38,17 +46,19 @@ def client() -> Generator[TestClient, None, None]:
     """Test client with clean database per test."""
     if engine_service.is_initialized:
         engine_service.shutdown()
+
+    # Drop and recreate all tables
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
 
-    # Seed master data + rules
-    from app.db_migration import seed_sdk_rules_from_dml
-    from app.models import Category, PatternType
+    # Seed master data + rules from JSON bundles (same flow as main.py)
     from app.database import SessionLocal
+    from app.services.rules_service import import_rules_from_bundle
     from sqlalchemy import text
 
-    # Seed categories and pattern types directly
     db = SessionLocal()
+
+    # Categories
     for name, label, desc, color in [
         ('I', 'Input Detection', 'Input detection rules', '#ef4444'),
         ('O', 'Output Detection', 'Output detection rules', '#f97316'),
@@ -56,8 +66,12 @@ def client() -> Generator[TestClient, None, None]:
         ('IAC', 'Infrastructure as Code', 'IAC misconfiguration rules', '#06b6d4'),
         ('BEHAVIOR', 'Behavior Monitoring', 'Behavior monitoring rules', '#ec4899'),
     ]:
-        db.execute(text("INSERT OR IGNORE INTO categories (name, label, description, color) VALUES (:n, :l, :d, :c)"),
-                   {'n': name, 'l': label, 'd': desc, 'c': color})
+        db.execute(
+            text("INSERT INTO categories (name, label, description, color) VALUES (:n, :l, :d, :c) ON CONFLICT DO NOTHING"),
+            {'n': name, 'l': label, 'd': desc, 'c': color},
+        )
+
+    # Pattern types
     for name, label, desc in [
         ('regex', 'Regex Match', 'Regex matching'),
         ('keyword', 'Keyword Match', 'Keyword matching'),
@@ -66,18 +80,16 @@ def client() -> Generator[TestClient, None, None]:
         ('dockerfile', 'Dockerfile Match', 'Dockerfile matching'),
         ('keyvalue', 'Key-Value Match', 'Key-value matching'),
     ]:
-        db.execute(text("INSERT OR IGNORE INTO pattern_types (name, label, description) VALUES (:n, :l, :d)"),
-                   {'n': name, 'l': label, 'd': desc})
-    db.commit()
+        db.execute(
+            text("INSERT INTO pattern_types (name, label, description) VALUES (:n, :l, :d) ON CONFLICT DO NOTHING"),
+            {'n': name, 'l': label, 'd': desc},
+        )
 
-    seed_sdk_rules_from_dml()
-
-    # Seed dictionaries (for rules that use dictionary refs)
-    from app.models.dictionary import Dictionary
-    import json
+    # Dictionaries
     I_CAT = db.execute(text("SELECT id FROM categories WHERE name = 'I'")).scalar()
     O_CAT = db.execute(text("SELECT id FROM categories WHERE name = 'O'")).scalar()
     SEC_CAT = db.execute(text("SELECT id FROM categories WHERE name = 'SEC'")).scalar()
+    from app.models.dictionary import Dictionary
     dictionary_seeds = [
         ('gdpr_health', 'GDPR Health Data', ['diagnosis','medical','patient','clinical','症状','疾病','诊断','糖尿病','患者','病人'], I_CAT),
         ('gdpr_biometric', 'GDPR Biometric', ['fingerprint','biometric','face_recognition','iris_scan','dna','gene','genetic'], I_CAT),
@@ -114,12 +126,19 @@ def client() -> Generator[TestClient, None, None]:
             db.add(d)
     db.commit()
 
+    # Load rules from JSON files (same path as main.py)
+    rules_dir = Path(__file__).resolve().parent.parent / "db" / "init" / "rules"
+    if rules_dir.exists():
+        for jf in sorted(rules_dir.glob("*-series.json")):
+            bundle = json.loads(jf.read_text())
+            import_rules_from_bundle(db, bundle, target="sdk")
+    db.commit()
+
     # Initialize engine with rules
     engine_service.initialize()
     engine_service.reload_rules_from_db(db)
     db.close()
 
-    # Create app with lifespan disabled
     from app.main import create_app
     app = create_app()
 

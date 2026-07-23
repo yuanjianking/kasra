@@ -90,7 +90,7 @@ journalctl -u kasra -f
 |----------|----------|---------|-------------|
 | `KASRA_APP_API_KEY` | **Yes** | — | API authentication key (generate: `openssl rand -hex 64`) |
 | `KASRA_APP_JWT_SECRET` | **Yes** | — | JWT signing secret (generate: `openssl rand -hex 64`) |
-| `KASRA_APP_DATABASE_URL` | **Yes** | `sqlite:///./data/kasra.db` | Database connection string |
+| `KASRA_APP_DATABASE_URL` | **Yes** | `postgresql+psycopg2://...` | PostgreSQL connection string |
 | `KASRA_APP_HOST` | No | `0.0.0.0` | Bind address |
 | `KASRA_APP_PORT` | No | `8080` | HTTP port |
 | `KASRA_APP_WORKERS` | No | `4` | Number of uvicorn workers |
@@ -183,7 +183,7 @@ PGPASSWORD=xxx pg_dump -Fc -U kasra -h localhost kasra > backup.dump
 ### Restore
 
 ```bash
-sudo bash deploy/scripts/restore.sh /var/backups/kasra/daily/kasra_daily_*.sqlite
+sudo bash deploy/scripts/restore.sh /var/backups/kasra/daily/kasra_daily_*.dump
 ```
 
 ## 🔒 Security Hardening

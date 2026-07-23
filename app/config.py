@@ -20,12 +20,13 @@ class AppSettings(BaseSettings):
 
     # ── Server ──
     host: str = "0.0.0.0"
-    port: int = 8080
+    port: int = 8090
     workers: int = 4
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 
-    # ── Database ──
-    database_url: str = "sqlite:///./data/kasra.db"
+    # ── Database (PostgreSQL only — SQLite is NOT supported) ──
+    # Format: postgresql+psycopg2://user:password@host:5432/database
+    database_url: str = "postgresql+psycopg2://kasra:kasra@localhost:5432/kasra"
 
     # ── Security ──
     api_key: str = "dev-api-key-change-in-production"

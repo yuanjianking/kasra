@@ -1,22 +1,26 @@
 """Integration test fixtures — shared across all integration test suites.
 
-Optimised for speed: tables created once per session, data cleaned per function.
+Uses PostgreSQL via a dedicated test database.
+Requires PostgreSQL to be running (docker-compose or local).
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
-import tempfile
+from pathlib import Path
 from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
 
-# Create a temporary database file for testing
-_test_db_fd, _test_db_path = tempfile.mkstemp(suffix="_kasra_integration_test.db")
+# PostgreSQL test database — override with KASRA_TEST_DATABASE_URL if needed
+_test_db_url = os.environ.get(
+    "KASRA_TEST_DATABASE_URL",
+    "postgresql+psycopg2://kasra:kasra-dev-password@localhost:5432/kasra_test",
+)
 
-# Override settings BEFORE importing app modules — also skip heavy services
-os.environ["KASRA_APP_DATABASE_URL"] = f"sqlite:///{_test_db_path}"
+os.environ["KASRA_APP_DATABASE_URL"] = _test_db_url
 os.environ["KASRA_APP_API_KEY"] = "integration-test-api-key"
 os.environ["KASRA_SKIP_FRONTEND"] = "true"
 os.environ["KASRA_SKIP_MCP"] = "true"
@@ -45,26 +49,25 @@ def _setup_db():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
-    try:
-        os.unlink(_test_db_path)
-    except OSError:
-        pass
 
 
 def _clear_tables():
     """Delete all rows from all tables (much faster than drop/create)."""
     from sqlalchemy import text
     with engine.begin() as conn:
-        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text("SET CONSTRAINTS ALL DEFERRED"))
         for table in reversed(Base.metadata.sorted_tables):
             conn.execute(table.delete())
-        conn.execute(text("PRAGMA foreign_keys=ON"))
+        conn.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
 
 
 @pytest.fixture(scope="function")
 def client() -> Generator[TestClient, None, None]:
     """Test client with clean database and freshly initialised engine."""
     from app.main import create_app
+    from app.services.rules_service import import_rules_from_bundle
+    from app.database import SessionLocal, init_db
+    from sqlalchemy import text
 
     _clear_tables()
 
@@ -73,19 +76,14 @@ def client() -> Generator[TestClient, None, None]:
         engine_service.shutdown()
     engine_service.initialize()
 
-    # Seed SDK rules from DML and load into engine
-    from app.database import SessionLocal, init_db
-    from app.db_migration import seed_sdk_rules_from_dml
+    # Seed master data + rules from JSON bundles (same flow as main.py)
     init_db()
-    seed_sdk_rules_from_dml()
-    load_db = SessionLocal()
+    db = SessionLocal()
 
     # Seed dictionaries for rules that use dictionary refs
-    from app.models.dictionary import Dictionary
-    from sqlalchemy import text
-    I_CAT = load_db.execute(text("SELECT id FROM categories WHERE name = 'I'")).scalar()
-    O_CAT = load_db.execute(text("SELECT id FROM categories WHERE name = 'O'")).scalar()
-    SEC_CAT = load_db.execute(text("SELECT id FROM categories WHERE name = 'SEC'")).scalar()
+    I_CAT = db.execute(text("SELECT id FROM categories WHERE name = 'I'")).scalar()
+    O_CAT = db.execute(text("SELECT id FROM categories WHERE name = 'O'")).scalar()
+    SEC_CAT = db.execute(text("SELECT id FROM categories WHERE name = 'SEC'")).scalar()
     dict_seeds = [
         ('pi_override_verbs', ['ignore','disregard','forget','override','overwrite','skip','bypass','无视','忽略'], I_CAT),
         ('pi_jailbreak_names', ['DAN','STAN','Jailbreak','developer mode','unrestricted mode','no filter','god mode'], I_CAT),
@@ -114,14 +112,22 @@ def client() -> Generator[TestClient, None, None]:
         ('internal_network_labels', ['internal','private','corp','intranet','local'], I_CAT),
     ]
     for code, entries, cat_id in dict_seeds:
-        existing = load_db.query(Dictionary).filter(Dictionary.code == code).first()
+        existing = db.query(Dictionary).filter(Dictionary.code == code).first()
         if not existing:
             d = Dictionary(code=code, name=code, entries=entries, category_id=cat_id, is_active=True)
-            load_db.add(d)
-    load_db.commit()
+            db.add(d)
+    db.commit()
 
-    engine_service.reload_rules_from_db(load_db)
-    load_db.close()
+    # Load rules from JSON files (same path as main.py)
+    rules_dir = Path(__file__).resolve().parent.parent / "db" / "init" / "rules"
+    if rules_dir.exists():
+        for jf in sorted(rules_dir.glob("*-series.json")):
+            bundle = json.loads(jf.read_text())
+            import_rules_from_bundle(db, bundle, target="sdk")
+    db.commit()
+
+    engine_service.reload_rules_from_db(db)
+    db.close()
 
     app = create_app()
 

@@ -10,7 +10,7 @@ class TestAppSettings:
         assert settings.host == "0.0.0.0"
 
     def test_default_port(self):
-        assert settings.port == 8080
+        assert settings.port == 8090
 
     def test_default_log_level_default_value(self):
         """The model's default log level is 'info' (env may override at runtime)."""

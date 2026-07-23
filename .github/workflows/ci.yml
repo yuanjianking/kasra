@@ -135,15 +135,15 @@ jobs:
         run: |
           docker run -d \
             --name kasra-smoke \
-            -p 8080:8080 \
+            -p 8090:8090 \
             -e KASRA_APP_API_KEY=ci-test-key \
             -e KASRA_APP_JWT_SECRET=ci-test-secret-must-be-at-least-32-chars!! \
             -e KASRA_AUDIT__ENABLED=false \
             kasra:ci-${{ github.sha }}
           sleep 5
           docker logs kasra-smoke
-          curl -f http://localhost:8080/health || (docker logs kasra-smoke && exit 1)
-          curl -f http://localhost:8080/v1/rules \
+          curl -f http://localhost:8090/health || (docker logs kasra-smoke && exit 1)
+          curl -f http://localhost:8090/v1/rules \
             -H "X-API-Key: ci-test-key" || (docker logs kasra-smoke && exit 1)
           docker stop kasra-smoke
 

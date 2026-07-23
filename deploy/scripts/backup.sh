@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Kasra — Enterprise Database Backup Script
+# Kasra — Database Backup Script (PostgreSQL only)
 # =============================================================================
 # Features:
-#   ✓ Supports PostgreSQL (pg_dump) and SQLite (sqlite3 or file copy)
-#   ✓ Encrypted backups (age/openssl)
+#   ✓ PostgreSQL pg_dump (custom format, compressed)
+#   ✓ Encrypted backups (age/openssl/GPG)
 #   ✓ Retention policy (daily/weekly/monthly rotation)
 #   ✓ S3-compatible upload (aws s3 or rclone)
-#   ✓ Integrity verification
 #   ✓ Prometheus metrics file for monitoring
 # =============================================================================
 set -euo pipefail
@@ -20,7 +19,7 @@ RETENTION_DAYS="${KASRA_BACKUP_RETENTION_DAYS:-30}"
 RETENTION_WEEKS="${KASRA_BACKUP_RETENTION_WEEKS:-12}"
 RETENTION_MONTHS="${KASRA_BACKUP_RETENTION_MONTHS:-6}"
 
-DATABASE_URL="${KASRA_DATABASE_URL:-sqlite:////data/kasra.db}"
+DATABASE_URL="${KASRA_DATABASE_URL:-postgresql+psycopg2://kasra:kasra@localhost:5432/kasra}"
 S3_BUCKET="${KASRA_BACKUP_S3_BUCKET:-}"
 ENCRYPTION_KEY="${KASRA_BACKUP_ENCRYPTION_KEY:-}"
 GPG_RECIPIENT="${KASRA_BACKUP_GPG_RECIPIENT:-}"
@@ -39,14 +38,8 @@ ensure_dir() {
 }
 
 get_db_type() {
-    case "$DATABASE_URL" in
-        sqlite*)  echo "sqlite" ;;
-        postgres*) echo "postgres" ;;
-        *)        echo "unknown" ;;
-    esac
+    echo "postgres"
 }
-
-# ── Backup Functions ─────────────────────────────────────────────────────────
 
 backup_postgres() {
     local dest="$1"
@@ -63,45 +56,6 @@ backup_postgres() {
         "$DATABASE_URL" 2>&1 || error "pg_dump failed"
 
     log "PostgreSQL backup complete: $(du -h "$dest" | cut -f1)"
-}
-
-backup_sqlite() {
-    local dest="$1"
-    local db_path
-
-    # Extract path from sqlite:///path
-    db_path="${DATABASE_URL#sqlite:///}"
-
-    if [ ! -f "$db_path" ]; then
-        # Try relative to KASRA_HOME
-        db_path="${KASRA_HOME}/${db_path}"
-    fi
-
-    if [ ! -f "$db_path" ]; then
-        error "SQLite database not found: $db_path (from $DATABASE_URL)"
-    fi
-
-    log "Backing up SQLite database: $db_path → $dest"
-
-    # Use sqlite3 backup API if available, else file copy with WAL flush
-    if command -v sqlite3 &>/dev/null; then
-        sqlite3 "$db_path" ".backup '$dest'" || error "sqlite3 backup failed"
-    else
-        # Manual WAL-safe backup using journal mode
-        sqlite3 "$db_path" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null || true
-        cp "$db_path" "$dest"
-    fi
-
-    # Integrity check
-    if command -v sqlite3 &>/dev/null; then
-        if sqlite3 "$dest" "PRAGMA integrity_check;" | grep -q "ok"; then
-            log "Integrity check passed"
-        else
-            error "Integrity check FAILED for $dest"
-        fi
-    fi
-
-    log "SQLite backup complete: $(du -h "$dest" | cut -f1)"
 }
 
 encrypt_backup() {
@@ -152,15 +106,11 @@ rotate_backups() {
     log "Rotating backups..."
 
     # Daily: keep last N days
-    find "$BACKUP_DIR/daily"   -name "*.sqlite*" -o -name "*.dump" -o -name "*.age" -o -name "*.gpg" | \
+    find "$BACKUP_DIR/daily"   \( -name "*.dump" -o -name "*.age" -o -name "*.gpg" \) | \
         sort | head -n -"$RETENTION_DAYS" | while read -r f; do
         rm -f "$f"
         log "Removed old daily backup: $f"
     done
-
-    # Weekly: keep last N weeks (move Sundays to weekly)
-    # Monthly: keep last N months (move 1st of month to monthly)
-    # (Simplified: rely on the rotation logic in the main function)
 }
 
 write_metrics() {
@@ -180,17 +130,15 @@ EOF
 
 main() {
     local timestamp
-    local db_type
     local backup_file
     local final_file
     local exit_code=0
 
     timestamp=$(date +%Y%m%d_%H%M%S)
-    db_type=$(get_db_type)
 
     echo "=========================================="
     echo "  Kasra Backup — $(date)"
-    echo "  DB Type:    $db_type"
+    echo "  DB Type:    PostgreSQL"
     echo "  Backup Dir: $BACKUP_DIR"
     echo "=========================================="
 
@@ -209,18 +157,10 @@ main() {
     fi
 
     # Add extension
-    case "$db_type" in
-        postgres) backup_file="${backup_file}.dump" ;;
-        sqlite)   backup_file="${backup_file}.sqlite" ;;
-        *)        backup_file="${backup_file}.db" ;;
-    esac
+    backup_file="${backup_file}.dump"
 
     # Perform backup
-    case "$db_type" in
-        postgres) backup_postgres "$backup_file" || exit_code=$? ;;
-        sqlite)   backup_sqlite "$backup_file" || exit_code=$? ;;
-        *)        error "Unknown database type: $db_type" ;;
-    esac
+    backup_postgres "$backup_file" || exit_code=$?
 
     if [ "$exit_code" -ne 0 ]; then
         error "Backup failed with exit code $exit_code"

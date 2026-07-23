@@ -1,0 +1,2968 @@
+{
+  "bundle": {
+    "series": "I",
+    "name": "Input Detection Rules",
+    "version": "1",
+    "total": 57
+  },
+  "rules": [
+    {
+      "id": "I-01",
+      "name": "GitHub Token",
+      "description": "Detect GitHub Personal Access Token (ghp_/gho_/ghu_/ghs_/ghr_) and GitLab Token (glpat-)",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "gh[oprsu]_[A-Za-z0-9_]{36,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "glpat-[A-Za-z0-9_\\-]{20,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "github_pat_[A-Za-z0-9_]{60,}",
+            "confidence": 0.95
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-02",
+      "name": "OpenAI API Key",
+      "description": "Detect OpenAI API Key (sk-proj- / sk-svcacct- format)",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "sk-proj-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20,}",
+            "confidence": 0.98
+          },
+          {
+            "type": "regex",
+            "value": "sk-svcacct-[A-Za-z0-9_-]{20,}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "sk-[A-Za-z0-9_-]{32,}",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-03",
+      "name": "Anthropic API Key",
+      "description": "Detect Anthropic Claude API Key (sk-ant-api format)",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "sk-ant-api03-[A-Za-z0-9_-]{40,}",
+            "confidence": 0.98
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-04",
+      "name": "Cloud Platform Credential",
+      "description": "Detect cloud platform credentials: AWS (AKIA/ASIA), GCP, Azure, Alibaba, Tencent Cloud, DigitalOcean, Oracle Cloud, IBM Cloud",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:A3T[A-Z0-9]|AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "\"type\":\\s*\"service_account\"[^}]*\"private_key_id\":\\s*\"[A-Za-z0-9_-]+\"",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "LTAI[A-Za-z0-9]{12,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "AKID[A-Za-z0-9]{15,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "dop_v1_[A-Za-z0-9_-]{30,}",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "ocid1\\.[a-z]+\\.[a-z]+[A-Za-z0-9.-]+",
+            "confidence": 0.85
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-05",
+      "name": "SaaS API Key",
+      "description": "Detect SaaS platform keys: Stripe, Twilio, Slack, Docker Hub, npm, GitLab, Datadog, NewRelic, PagerDuty, SendGrid, Mailgun, Mailchimp, HubSpot, Salesforce, Shopify, SonarQube, Atlassian, Grafana, HashiCorp, Cloudflare, Heroku",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "sk_live_[A-Za-z0-9]{20,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "rk_live_[A-Za-z0-9]{20,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "whsec_[A-Za-z0-9]{16,}",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "SK[A-Za-z0-9]{30,}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "AC[A-Za-z0-9]{30,}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "xox[bpras]-[A-Za-z0-9-]{20,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "xapp-[A-Za-z0-9-]{40,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "dckr_pat_[A-Za-z0-9_-]{20,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "npm_[A-Za-z0-9]{36,}",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "gl-dpt-[A-Za-z0-9_-]{20,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "dd[spg]_[A-Za-z0-9]{20,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "NRRA-[A-Za-z0-9]{27,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "SG\\.[A-Za-z0-9_-]{20,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "shpat_[A-Za-z0-9]{30,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "squ-[A-Za-z0-9_-]{20,}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "hvs\\.[A-Za-z0-9_-]{30,}",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "cf-[A-Za-z0-9_-]{30,}",
+            "confidence": 0.85
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-06",
+      "name": "Generic Password/Secret",
+      "description": "Detect generic password/secret/API key assignments in key=value form",
+      "severity": "P0",
+      "action": "block",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:password|passwd|pwd|密码|密钥|凭证|令牌|api密钥|登录密码|数据库密码|secret|api[_-]?key|api[_-]?secret|auth[_-]?token|access[_-]?token|auth[_-]?bearer|SECRET_KEY|API_KEY|ACCESS_KEY|AUTH_TOKEN|DB_PASSWORD)\\s*(?:[:=：]|是：?|为：?)\\s*['\"]?[A-Za-z0-9_@#$%^&+=!一-鿿]{6,}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "-----BEGIN (?:RSA |OPENSSH |DSA |EC |Ed25519 |PGP )?PRIVATE KEY-----",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "-----BEGIN (?:PGP |SSH2 )?ENCRYPTED PRIVATE KEY-----",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "-----BEGIN CERTIFICATE-----",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "Authorization:\\s+Bearer\\s+[A-Za-z0-9_\\-]{16,}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:SECRET_KEY|API_KEY|ACCESS_KEY|AUTH_TOKEN|DB_PASSWORD|LOGIN_PASSWORD)\\s*[:=]\\s*['\\\"]?[A-Za-z0-9_@#$%^&+=!\\-]{8,}['\\\"]?",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:password|passwd|pwd|数据库密码|DB\\s*[Pp]assword|数据库.*密码)\\s+(?:is\\s*[:=]?|[:=]|：|は\\s*[:=]?|是)\\s+['\"]?[A-Za-z0-9_@#$%^&+=!]{6,}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:パスワード|暗号鍵|シークレット|api[_-]?key|secret|password)\\s*(?:は\\s*[:=：]?|[:=：]|＝)\\s*['\"]?[A-Za-z0-9_@#$%^&+=!]{6,}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:The\\s+)?(?:database|server|admin|root|db)\\s+(?:password|passwd|pwd|secret)\\s+(?:is\\s*[:=：]?|[:=]|：)\\s+['\"]?[A-Za-z0-9_@#$%^&+=!]{6,}",
+            "confidence": 0.5
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-07",
+      "name": "Private Key / PEM Certificate",
+      "description": "Detect PEM-format private keys and certificates: RSA/OPENSSH/DSA/EC/Ed25519/PGP/PKCS#8",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "-----BEGIN (?:RSA |OPENSSH |DSA |EC |Ed25519 )?PRIVATE KEY-----",
+            "confidence": 0.98
+          },
+          {
+            "type": "regex",
+            "value": "-----BEGIN PGP PRIVATE KEY BLOCK-----",
+            "confidence": 0.98
+          },
+          {
+            "type": "regex",
+            "value": "-----BEGIN (?:ENCRYPTED |PROC-TYPE: )?PRIVATE KEY-----",
+            "confidence": 0.95
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-08",
+      "name": "JWT Token",
+      "description": "Detect JWT/Bearer Token (Base64 URL triple segments starting with eyJ)",
+      "severity": "P1",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "Bearer\\s+eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "\\beyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\b",
+            "confidence": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-09",
+      "name": "Database Connection String",
+      "description": "Detect database connection string leak: mysql://, postgresql://, mongodb://, redis://, etc.",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:mysql|postgresql|mongodb|oracle|sqlserver|redis|memcached|cassandra|elasticsearch|couchbase|neo4j|clickhouse|influxdb|mssql|db2|sqlite)://[A-Za-z0-9_%]*:[^@\\s]+@",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "mongodb\\+srv://[A-Za-z0-9_%]*:[^@\\s]+@",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "Server\\s*=\\s*tcp:[^;]+;\\s*(?:Database|Initial Catalog)\\s*=\\s*[^;]+;\\s*User\\s+ID\\s*=\\s*[^;]+;\\s*Password\\s*=\\s*[^;]+",
+            "confidence": 0.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-10",
+      "name": "Crypto Wallet / Blockchain Key",
+      "description": "Detect cryptocurrency wallet addresses and private keys",
+      "severity": "P1",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "0x[A-Fa-f0-9]{40}(?:[A-Fa-f0-9]{24})?",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "[13][a-km-zA-HJ-NP-Z1-9]{25,34}",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "bc1[ac-hj-np-z02-9]{39,59}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "5[HJK][1-9A-HJ-NP-Za-km-z]{49}",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "0x[A-Fa-f0-9]{64}",
+            "confidence": 0.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-11",
+      "name": "Phone Number",
+      "description": "Detect global phone numbers with auto-redaction: China, US/CA, UK, DE, FR, JP, KR, IN, BR, AU, RU, Middle East, Africa",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:\\+?86)?1[3-9]\\d{9}\\b",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+1\\s?)?\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}\\b",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+44\\s?7\\d{3}|07\\d{3})\\s?\\d{3}\\s?\\d{3}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+49\\s?1[567]\\d|01[567]\\d)\\s?\\d{3}\\s?\\d{4,7}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+81\\s?0?[789]0|0[789]0)[\\s-]?\\d{4}[\\s-]?\\d{4}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+91\\s?|0)?[6789]\\d{9}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+55\\s?\\(?\\d{2}\\)?)\\s?\\d{4,5}-?\\d{4}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\+82\\s?)?10[\\s-]?\\d{4}[\\s-]?\\d{4}\\b",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-12",
+      "name": "National ID Number",
+      "description": "Detect national ID numbers globally: China ID, US SSN, UK NINO, Japan MyNumber, Korea RRN, India Aadhaar/PAN, Canada SIN, Brazil CPF/CNPJ, Australia TFN, etc.",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b[1-9]\\d{5}(?:19|20)\\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\\d|3[01])\\d{3}[\\dXx]\\b",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{3}-\\d{2}-\\d{4}\\b",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\b[A-CEGHJ-PR-TW-Z]{2}\\d{6}[A-D ]\\b",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{12}\\b",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{4}-\\d{4}-\\d{4}-\\d{4}\\b",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{2}\\.\\d{3}\\.\\d{3}/\\d{4}-\\d{2}\\b",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\b[A-Z]{5}\\d{4}[A-Z]\\b",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{4}-\\d{4}-\\d{4}\\b",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-13",
+      "name": "Email Address",
+      "description": "Detect email addresses (local-part@domain.tld)",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
+            "confidence": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-14",
+      "name": "Credit Card Number",
+      "description": "Detect global credit/debit card numbers with Luhn validation: Visa, MasterCard, AMEX, Discover, Diners, JCB, China UnionPay",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b4\\d{3}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b5[1-5]\\d{2}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b3[47]\\d{2}[\\s-]?\\d{6}[\\s-]?\\d{5}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:6011|65)(?:[\\s-]?\\d{4}){3}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b62\\d{2}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4,7}\\b",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-15",
+      "name": "Passport Number",
+      "description": "Detect global passport numbers: China (E/F/G+8 digits), US, UK, Canada, Australia, Japan, Korea, Germany, France, Brazil, India, Russia",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b[EFG]\\d{8}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b[0-9]{9}\\b",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "\\b[A-Z]{2}\\d{7}\\b",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "\\b[A-Z]\\d{8}\\b",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "\\b[ABEGHJ-NP-Y]\\d{6,7}\\b",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-16",
+      "name": "IBAN / Bank Account",
+      "description": "Detect international bank account numbers: IBAN, US ABA+account, UK Sort+Account, Canada Transit+Account, Australia BSB+Account, China debit card, India IFSC",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b[A-Z]{2}\\d{2}[A-Z0-9]{11,30}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{3}-\\d{1,7}-\\d{1,10}\\b",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{2}-\\d{2}-\\d{2}\\s\\d{8}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\d{3}\\s\\d{3}\\s\\d{6,10}\\b",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\b[A-Z]{4}0[A-Z0-9]{6}\\b",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-17",
+      "name": "Public IP Address (PII)",
+      "description": "Detect public IPv4/IPv6 addresses as PII (excluding private/internal ranges)",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b(?!(?:10\\.|172\\.(?:1[6-9]|2\\d|3[01])\\.|192\\.168\\.|127\\.|169\\.254\\.))(?:\\d{1,3}\\.){3}\\d{1,3}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:[\\da-fA-F]{1,4}:){7}[\\da-fA-F]{1,4}\\b",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:[\\da-fA-F]{1,4}:){1,6}:?[\\da-fA-F]{1,4}(?::[\\da-fA-F]{1,4})?\\b",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-18",
+      "name": "Full Name / Real Name",
+      "description": "Detect full names in context: Chinese (2-4 characters), Western (First Last), email name fragments, signature blocks",
+      "severity": "P2",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "name_indicators",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:Best|Sincerely|Regards|Yours|此致|敬礼|祝好)[,\\s]*\\n\\s*[A-Za-z一-鿿\\s]{2,50}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "[A-Z][a-z]+\\s+[A-Z][a-z]+",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "姓名[：:]\\s*[一-鿿]{2,4}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\"[full_name|name|user_name|real_name|联系人|姓名]\"\\s*:\\s*\"[一-鿿]{2,4}\"",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:氏名|名前|連絡先)[：:]\\s*[一-鿿]{2,6}",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-19",
+      "name": "Date of Birth",
+      "description": "Detect dates of birth in various formats: ISO, Chinese, US, European",
+      "severity": "P2",
+      "action": "redact",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b(?:\\d{4}[-年]\\d{1,2}[-月]\\d{1,2}[日]?)\\b",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:birth|dob|birthday|出生|生日|诞生日)[\\s:=\\u4e00-\\u9fff]*\\d{4}[-/年]\\d{1,2}[-/月]\\d{1,2}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:birth|dob|birthday)\\s*[:=]\\s*\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:birth|dob|birthday)\\s*[:=]\\s*['\\\"]?\\d{1,2}[/-]\\d{1,2}[/-]\\d{4}\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\"(?:birth|dob|birthday)\"\\s*:\\s*\"\\d{1,2}/\\d{1,2}/\\d{4}\"",
+            "confidence": 0.7
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-20",
+      "name": "GDPR Art.9 Special Category Data",
+      "description": "Detect GDPR Article 9 special category personal data: health/medical, biometric, genetic, political opinions, religious beliefs, union membership, race/ethnicity, sexual orientation",
+      "severity": "P1",
+      "action": "redact",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "gdpr_health",
+            "confidence": 0.4
+          },
+          {
+            "type": "dictionary",
+            "ref": "gdpr_biometric",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "(?:基因|基因检测|基因突变|生物特征|指纹|虹膜|人脸识别)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:种族|种族类别|民族|政治倾向|宗教信仰|性取向|工会|哲学|政治观点)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:选民|选举|政治党派|政党|民主|共和|政治立场)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-21",
+      "name": "Prompt Injection",
+      "description": "Detect prompt injection attacks: system instruction override, system prompt rewriting, reverse control instructions, Unicode variant bypass, base64/hex encoded injection",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "pi_override_verbs",
+            "confidence": 0.4
+          },
+          {
+            "type": "dictionary",
+            "ref": "pi_jailbreak_names",
+            "confidence": 0.85
+          },
+          {
+            "type": "dictionary",
+            "ref": "pi_output_verbs",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "(?:以前|過去|前に|これまで|今まで).{0,20}(?:指示|命令|指令|ルール|規則|制限).{0,20}(?:無視|忘れ|スキップ|バイパス|オーバーライド|無効)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:すべての|全ての|これまでの|今までの).{0,10}(?:指示|命令|指令|ルール|制限).{0,10}(?:無視|忘れ|無効|バイパス)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:システムプロンプト|AI|アシスタント).{0,20}(?:上書き|オーバーライド|無視|変更|バイパス)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-22",
+      "name": "Jailbreak / Role-Play Attack",
+      "description": "Detect jailbreak attacks: role-playing (DAN, AoE), developer mode, simulated conversation, adversarial prompts, encrypted hiding, multi-turn incremental jailbreak",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "pi_jailbreak_pretend",
+            "confidence": 0.7
+          },
+          {
+            "type": "dictionary",
+            "ref": "pi_jailbreak_names",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:开发者模式|开发模式|developer mode|dev mode|unlocked mode|free mode|freedom mode)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:grandma|grandmother|late|deceased|passed\\s+away|奶奶|祖母|亡くなった|死んだ|死去した).*(?:password|secret|key|code|read|told|念|说|读|保险柜|密码|パスワード|金庫|合言葉|番号|読ん|教え)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:学术研究|学术目的|教育目的|仅用于研究|科研项目|只是为了.*学术)",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "(?:不受约束|不受限制|无限模式|无限制模式|突破限制|解除限制|破解限制)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:亡くなった|死んだ|死去した|他界した|故).{0,10}(?:祖母|祖父|父|母|おばあちゃん|おじいちゃん).{0,30}(?:パスワード|暗号|秘密|合言葉|番号|読ん|教え|金庫|セーフ)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:あなたは|お前は|君は).{0,10}(?:DAN|制限のない|無制限|自由|なんでも|何でも).{0,20}(?:モード|AI|アシスタント|状態)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:制限|規制|ルール|規則|フィルター|ガードレール).{0,10}(?:回避|バイパス|無効|解除|突破|無視|スキップ)",
+            "confidence": 0.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-23",
+      "name": "OS Command Injection",
+      "description": "Detect OS command injection in prompts: shell injection, backtick execution, argument injection, Windows commands, encoding bypass",
+      "severity": "P0",
+      "action": "block",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "[`$][\\s]*[;|&][\\s]*(?:rm\\s+(?:-rf|\\/)|shutdown|reboot|mkfs|dd\\s+if=|:(){ :\\|:& };:|chmod\\s+777|wget|curl|bash\\s+-i|nc\\s+(?:-e|-l)|python\\s+-c\\s+['\"]import\\s+socket)",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "\\$(?:\\s*)\\(\\s*(?:cat|curl|wget|bash|sh|python|perl|ruby|nc|nmap|chmod|rm|mv|kill|echo)\\s+",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "`(?:cat|curl|wget|bash|sh|python|perl|ruby|nc|nmap|chmod|rm|mv|kill|echo)\\s+",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:cmd\\.exe|powershell|pwsh)\\s+(?:\\/c|\\-c|-Command)\\s+",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "rm -rf /",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "(?:bash|sh|zsh|ksh)\\s+(?:-c|\\-c)\\s+['\"][A-Za-z0-9_\\s;|&<>$()=`'\"\\/]+['\"]",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "chmod 777",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\w+(?:\\s+\\w+)*\\s*\\|\\s*(?:bash|sh|zsh|ksh|python|perl|ruby|powershell|cmd)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "`.+`",
+            "confidence": 0.5
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-24",
+      "name": "SQL Injection in Prompt",
+      "description": "Detect SQL injection features: MySQL, PostgreSQL, MSSQL, Oracle, SQLite, NoSQL MongoDB $where injection, Couchbase N1QL injection",
+      "severity": "P2",
+      "action": "warn",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|TRUNCATE|EXEC|EXECUTE)\\s+.+\\b(FROM|INTO|TABLE|SET|WHERE|VALUES|PROCEDURE|XP_|SP_)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:pg_sleep|xp_cmdshell|sp_executesql|OPENROWSET|UTL_HTTP|DBMS_XMLQUERY|LOAD_FILE|INTO\\s+OUTFILE|BENCHMARK|ATTACH\\s+DATABASE|load_extension)\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\'\\s*(?:OR|AND)\\s+(?:\\d+|'[^']*')\\s*(?:=|>|<|LIKE|IN|BETWEEN)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\$where|\\$ne|\\$gt|\\$regex|\\$nin|\\$or|\\$and",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "';\\s*(?:DROP|DELETE|UPDATE|INSERT|EXEC|SHUTDOWN)\\s+",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "\\d+\\s+(?:AND|OR)\\s+\\d+\\s*[<>=!]+\\s*\\d*",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-25",
+      "name": "NoSQL Injection",
+      "description": "Detect NoSQL injection features: MongoDB $where/$ne/$gt/$regex operator injection, JSON injection, REST API parameter injection, Couchbase N1QL injection, Firebase bypass",
+      "severity": "P2",
+      "action": "warn",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\$ne\\s*[:=]\\s*(?:null|\\\"|\\'|\\d|true|false)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\$gt\\s*\\\"?\\s*[:=]\\s*(?:\\\"|\\'|\\d)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\$regex\\s*[:=]\\s*['\"]\\.*['\"]",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "$where",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "$nin",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "\\$ne\\s*:",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\$ne\\s*:",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\$ne[\"\\']?\\s*:",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\$gt[\\s:]*['\\\"]?\\d+['\\\"]?",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\$regex[\\s:]*['\\\"].*\\.[*+]?['\\\"]",
+            "confidence": 0.6
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-26",
+      "name": "SSTI (Server-Side Template Injection)",
+      "description": "Detect template injection payloads: Jinja2, Handlebars/Mustache, Mako, Freemarker, Velocity, Thymeleaf, Twig, Smarty, Pug, Nunjucks, Jade",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\{\\{\\s*(?:config|self|class|__class__|__subclasses__|__builtins__|__globals__|__mro__|__init__|__import__)",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "\\$\\{[A-Za-z_][A-Za-z0-9_.()]*\\}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\{\\{\\s*[A-Za-z_][A-Za-z0-9_.()]*\\s*\\|\\s*(?:attr|join|map|select|reject|first|last|random|length|string)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\$\\{self\\.module\\.cache\\}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "<#assign\\s+[A-Za-z_][A-Za-z0-9_]*\\s*=",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "#set\\s*\\(\\s*\\$[A-Za-z_]",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\{\\{\\s*[A-Za-z_][A-Za-z0-9_.]*\\s*\\(\\s*\\)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\$\\{[^}]+\\}",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "\\{/?php\\}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\{\\{.*\\}\\}",
+            "confidence": 0.3
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-27",
+      "name": "XXE / XML Injection",
+      "description": "Detect XML External Entity injection: DOCTYPE, ENTITY, SYSTEM file://, DTD external reference, XInclude, SOAP XML injection, SVG XXE",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "<!DOCTYPE\\s+[A-Za-z_][A-Za-z0-9_.]*\\s+\\[\\s*<!ENTITY\\s+",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "<!ENTITY\\s+[A-Za-z_][A-Za-z0-9_.]*\\s+SYSTEM\\s+['\"]",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "<!ENTITY\\s+[A-Za-z_][A-Za-z0-9_.]*\\s+PUBLIC\\s+['\"]",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\bxi:include\\s+(?:href|parse|xpointer)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\bxmlns:xi\\s*=\\s*['\"]http://www\\.w3\\.org/2001/XInclude['\"]",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-28",
+      "name": "LDAP Injection",
+      "description": "Detect LDAP injection patterns: filter injection, DN injection, search base tampering",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\*\\)\\s*\\(\\s*(?:uid|cn|sn|ou|dc|o|c|mail|userPassword)\\s*=\\s*\\*",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "\\(\\s*\\|\\s*\\(\\s*[A-Za-z]+\\s*=\\s*[^)]*",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\b\\*\\s*\\)\\s*\\(\\s*\\|\\s*\\(",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\(\\s*&\\s*\\(\\s*[A-Za-z]+\\s*=\\s*[^)]*\\)\\s*\\(\\s*[A-Za-z]+\\s*=\\s*[^)]*\\)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "[\\\"\\'\\)]\\s*&\\s*\\(",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "admin\\s*\\*|admin\\s*\\)\\(&\\)",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-29",
+      "name": "Indirect Prompt Injection",
+      "description": "Detect hidden injection from external/untrusted sources: web hidden text, zero-width injection, email signature injection, third-party library README hidden instructions, forum code attack payloads",
+      "severity": "P1",
+      "action": "warn",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "[\\u200B\\u200C\\u200D\\uFEFF\\u200E\\u200F\\u2060\\u2061\\u2062\\u2063\\u2064]",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "style\\s*=\\s*['\"]display\\s*:\\s*none['\"]",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "<!--\\s*(?:ignore|hidden|invisible|for\\s+AI|system|instruction|prompt)\\s*-->",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "<!--.*?(?:ignore|hidden|for\\s+AI|system|instruction|prompt|override|output|delete|remove|bypass).*?-->",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:for\\s+AI|AI instruction|hidden instruction|ignore above|ignore previous|ignore all).*?(?:output|print|show|display|execute|run|delete|remove)",
+            "confidence": 0.5
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-30",
+      "name": "SSRF Intent",
+      "description": "Detect user asking AI to access internal services or cloud metadata: AWS metadata, GCP metadata, Azure metadata, K8s API Server, internal networks, internal service names",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:169\\.254\\.169\\.254|metadata\\.google\\.internal|metadata\\.google\\.compute)",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "(?:kubernetes\\.default\\.svc|kube-dns|kube-apiserver|kubelet)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0)\\s*[:/]\\s*(?:6379|9200|27017|5432|3306|80|443|8080|9090|5000|8000|3000)",
+            "confidence": 0.7
+          },
+          {
+            "type": "dictionary",
+            "ref": "internal_network_labels",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-31",
+      "name": "System Prompt Extraction",
+      "description": "Detect user trying to extract AI system instructions: request to repeat system prompt verbatim, reverse-engineer system prompt, step-by-step extraction, code block output, token-by-token extraction",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "pi_output_verbs",
+            "confidence": 0.7
+          },
+          {
+            "type": "dictionary",
+            "ref": "pi_system_nouns",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:output|print|show|display|reveal|write)\\s+(?:the\\s+)?(?:first|initial|beginning|start|opening|previous)\\s+(?:\\d+\\s+)?(?:words|lines|characters|paragraphs|sentences|tokens)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:how\\s+(?:were\\s+you|are\\s+you|were\\s+you\\s+initially)\\s+(?:programmed|instructed|trained|configured|designed|built|coded)|what\\s+were\\s+you\\s+(?:told|given|programmed|instructed|designed|configured)\\s+(?:at\\s+the\\s+beginning|at\\s+(?:the\\s+)?start|initially|originally))",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:重复|输出|打印|显示).*(?:系统指令|系统提示|system prompt|全部指令)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:システムプロンプト|システム指示|最初のメッセージ|初期設定|プロンプト).{0,20}(?:出力|表示|印刷|見せ|教え|コピー|ペースト)",
+            "confidence": 0.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-32",
+      "name": "Homoglyph / Unicode Confusion",
+      "description": "Detect homoglyph/Unicode confusion attacks: full-width characters, Latin-Cyrillic substitutions, zero-width insertion, bidirectional text override, Unicode normalization attacks",
+      "severity": "P1",
+      "action": "clean",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "[\\uFF01-\\uFF5E]",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "[\\u200B\\u200C\\u200D\\uFEFF\\u200E\\u200F\\u2060\\u2061\\u2062\\u2063\\u2064\\u2066\\u2067\\u2068\\u2069\\u202A\\u202B\\u202C\\u202D\\u202E]",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "[\\u0400-\\u04FF]{2,}",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "[A-Za-z0-9\\s]{2,}[一-鿿぀-ゟ゠-ヿЀ-ӿͰ-Ͽ]{1,}[A-Za-z0-9\\s]{2,}",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "[A-Za-z0-9][぀-ゟ゠-ヿЀ-ӿ]",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-33",
+      "name": "Base64 / Encoded Payload",
+      "description": "Detect highly encoded/obfuscated hidden attack instructions: Base64 long strings, multi-layer encoding, image/file steganography, string split/join evasion, XOR encoding, ROT13, custom encoding",
+      "severity": "P1",
+      "action": "warn",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "[A-Za-z0-9+/]{30,}={0,2}",
+            "confidence": 0.35
+          },
+          {
+            "type": "regex",
+            "value": "(?:eval|exec|decode|unescape|fromCharCode|btoa|atob|Buffer\\.from)\\s*\\(\\s*(?:['\"][A-Za-z0-9+/=]{20,}['\"]|\\w+)\\s*\\)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:[A-Za-z0-9+/]{30,}={0,2})\\b",
+            "confidence": 0.35
+          },
+          {
+            "type": "regex",
+            "value": "(?:String\\.fromCharCode|unescape|decodeURIComponent|decodeURI)\\s*\\([^)]{30,}\\)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:echo|printf)\\s+[A-Za-z0-9]+\\s*(?:\\|\\s*xxd\\s*-r\\s*-p|\\|\\s*base64\\s*-d|\\|\\s*openssl\\s+enc\\s+-d)\\s*(?:\\|\\s*(?:bash|sh|python))",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:riny|rot13|rot-13|ROT13|caesar|cipher|tr\\s+['\\\"][A-Za-z]['\\\"]['\\\"][A-Za-z]['\\\"])",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:解码|decode|decrypt|解密|编码|encode).*(?:并|then|and).*(?:执行|execute|run|exec|eval)",
+            "confidence": 0.5
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-34",
+      "name": "Non-linguistic / Format Probing",
+      "description": "Detect non-linguistic model probing behavior: base64/hex/binary messages without natural language, single special character probing, prompt format fuzzing, model identity probing, parameter boundary value injection",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "^[A-Za-z0-9+/]{40,}={0,2}$",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "^[0-9a-fA-F]{40,}$",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "^(?:What\\s+(?:model|version|AI|LLM|AI model|AI system|AI assistant)|Who\\s+(?:made|created|built|developed|designed|programmed)|Which\\s+(?:company|organization|team))\\s+(?:are you|made you|built you|created you|developed you|programmed you|designed you)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "^[\\[\\]{}()<>|;:,.?!@#$%^&*+=/\\\\]{5,}$",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "^[A-Za-z0-9\\s]{50,}$",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "[\\[\\]{}()<>|;:,.?!@#$%^&*+=/\\\\]{8,}",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:What\\s+(?:model|version|AI|LLM|AI model|AI system|AI assistant)|Who\\s+(?:made|created|built|developed|designed|programmed)|Which\\s+(?:company|organization|team))\\s+(?:are you|made you|built you|created you|developed you|programmed you|designed you)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "^[01]{40,}$",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "^[01]{20,}$",
+            "confidence": 0.3
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-35",
+      "name": "Sensitive File Read",
+      "description": "Detect user asking to read sensitive files: .env, credentials.json, system files, SSH keys, cloud metadata endpoints, K8s secrets, certificates, system DBs",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:read|open|view|get|fetch|show|display|dump|cat|less|more|tail|head|list|输出|读取|打开|查看|显示|打印)\\s*(?:the\\s+|this\\s+|that\\s+)?(?:content|file|document|config|configuration|settings|file content|源码|代码|文件|配置|内容|日志)",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "(?:读取|查看|打开|显示|cat|read|view|show|list|打印)\\s*(?:.*(?:\\.env|credentials|kubeconfig|/etc/passwd|/etc/shadow|ssh/id_rsa|ca\\.pem))",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\.env|环境变量|env\\s+文件).*(?:读取|配置|数据库|密码|secret|token|key|连接串)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:kubeconfig|证书|ca\\.pem|\\.pem|\\.key|id_rsa).*(?:读取|查看|显示|配置|内容)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:読み取り|読み込む|開く|表示|見る|取得|cat|read|取得).{0,20}(?:\\.env|credentials|\\.git/config|\\.npmrc|\\.aws|\\.kube|\\.ssh/id_rsa|\\/etc\\/passwd|\\/etc\\/shadow)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\.env|credentials|\\.aws).*(?:読み取り|読み込む|開く|表示|見る|取得|内容)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-36",
+      "name": "Credential Repository File",
+      "description": "Detect user asking to read credential/config repository files: .git/config, .git-credentials, .npmrc, .pypirc, .dockercfg, ~/.aws/credentials, GCP service account, Azure profile, K8s config, Gradle/Maven settings, Terraform state",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": ".git/config",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": ".git-credentials",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": ".npmrc",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": ".pypirc",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": ".dockercfg",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "~/.aws/credentials",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "~/.aws/config",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "application_default_credentials.json",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "service-account-key.json",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "~/.azure/msal_token_cache.json",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "~/.kube/config",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "settings-security.xml",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "~/.ssh/id_rsa",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "gradle.properties",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-37",
+      "name": "Large Binary File",
+      "description": "Detect user referencing large/binary files: .db/.sqlite, .exe/.dll/.so, .zip/.tar.gz/.7z/.rar, .iso/.dmg, .bin/.dat, .pcap, .min.js, .pyc/.class, .dmp, .vmdk/.qcow2",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:read|open|view|analyze|examine|process|load|upload|import|extract|unzip|解压|读取|分析|打开|加载|上传|导入|处理)\\s*(?:this|that|the\\s+)?(?:file|archive|binary|executable|image|database|dump|zip|压缩包|文件|二进制|数据库)",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\.db|\\.sqlite|\\.sqlite3|\\.exe|\\.dll|\\.so|\\.dylib|\\.zip|\\.tar(?:\\.gz|\\.bz2|\\.xz)?|\\.7z|\\.rar|\\.iso|\\.bin|\\.dmg|\\.pkg)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "\\d+\\s*(?:MB|GB|KB|M|G|兆).*(?:文件|binary|sqlite|exe|dll|pcap|数据库|可执行|二进制)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:分析|读取|打开|解压|提取|处理).*\\d+\\s*(?:MB|GB|KB|兆|G).*(?:文件|pcap|sqlite|exe|zip|tar|7z)",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-38",
+      "name": "Zip Slip / Archive Extraction Risk",
+      "description": "Detect path traversal risk in archive extraction: Zip Slip (../ in entry names), tar symlink escape, RAR absolute path attack",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:extract|unzip|untar|decompress|解压|提取|展开|解凍|解凍する).*(?:\\.\\.\\/|%2e%2e%2f|\\.\\.%2f)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:%2e%2e%2f|%2e%2e%5c|\\.\\.%2f|%252e%252e%252f)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:符号链接|软链接|symlink|symbolic\\s+link).*(?:逃逸|escape|\\.\\.|traversal|路径)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:extract|unzip|untar|decompress|解凍|解凍|展開|解压).{0,50}(?:\\\\.\\\\.\\/|\\\\.\\\\.%2f|%2e%2e|path traversal|上述|上記)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:which\\s+contains|containing|includes|含む|含ん|を含む|含まれ).{0,30}(?:\\.\\.\\/|%2e%2e|traversal)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-39",
+      "name": "Multi-modal / File-based Hidden Payload",
+      "description": "Detect hidden attack instructions in non-plaintext files: image metadata steganography, PDF metadata, SVG malicious scripts, Office document macros, archive path traversal, Markdown/HTML hidden content",
+      "severity": "P1",
+      "action": "warn",
+      "applicable_stages": [
+        "input"
+      ],
+      "category": "I",
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "<script\\s+[^>]*>(?:<\\!\\[CDATA\\[)?\\s*(?:alert|eval|fetch|XMLHttpRequest|ActiveXObject)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "on(?:load|click|mouseover|focus|submit|error|unload|resize)\\s*=\\s*['\"]",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "<\\?xml[^>]*?>.*?<!DOCTYPE\\s+[^>]*?\\[.*?<!ENTITY",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "Sub AutoOpen()",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "Workbook_Open",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "Auto_Open",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "Document_Open",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "<script[^>]*>.*?</script>",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:PDF|pdf|文档|文件).*(?:嵌入式|隐藏|包含|含有).*(?:JavaScript|脚本|JS|宏|VBA|script|macro)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:提取|读取|分析|查看).*(?:隐藏|hidden|embedded|嵌入).*(?:内容|数据|脚本|metadata|元数据)",
+            "confidence": 0.4
+          }
+        ]
+      },
+      "enabled": true
+    },
+    {
+      "id": "I-40",
+      "name": "Proprietary Code / Copyright Ingestion",
+      "description": "Detect user input that may infringe intellectual property: analyzing third-party closed-source code, reverse engineering binaries, deobfuscating copyrighted software, explaining NDA-protected code, reproducing competitor core logic",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:analyze|analyse|explain|understand|examine|reverse)\\s+(?:this\\s+)?(?:binary|executable|compiled|obfuscated|minified|closed[\\s-]source)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:反编译|decompile|逆向|reverse|分析|analyze|反混淆|deobfuscate).*(?:二进制|binary|exe|dll|可执行|闭源|\\.NET|class|字节码)",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "(?:反混淆|deobfuscate|去混淆|unminify|还原).*(?:代码|JS|JavaScript|脚本|script|程序)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:NDA|保密协议|非公开|专有|proprietary|机密|internal\\s+use).*(?:代码|code|review|分析|analyze|检查|审计)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:リバース|逆コンパイル|逆アセンブル|デコンパイル|逆解析).{0,30}(?:エンジニア|バイナリ|実行可能|exe|dll|\\.NET|class|コード|プログラム)",
+            "confidence": 0.65
+          },
+          {
+            "type": "keyword",
+            "value": "逆コンパイル",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-41",
+      "name": "Resource Exhaustion / Compression Bomb",
+      "description": "Detect user inducing AI to consume excessive compute resources: zip bomb extraction, recursive expansion, giant output generation, self-referencing recursion, catastrophic backtracking",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:expand|extract|decompress|unzip|repeat|loop)\\s+(?:this|that|it|the\\s+file|the\\s+archive)\\s+(?:\\d{2,}|many\\s+times|repeatedly|a\\s+lot)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:generate|create|produce|write|output|print|make)\\s+(?:an?\\s+)?(?:extremely|very|incredibly|massively|unusually)\\s+(?:large|big|huge|deep|long|nested)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:递归|递归展开|nested|嵌套|recursive).*(?:解压|extract|unzip|展开|expand|loop).*\\d+.*(?:层|级|次|times|iterations|rounds)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:生成|输出|打印|写出|write|generate|print|output).*(?:\\d+\\s*(?:万|亿|千|百|million|billion|thousand|hundred)).*(?:行|条|个|件|文件|lines|records|items)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:zip\\s+bomb|压缩炸弹|压缩包炸弹).*(?:解压|extract|unzip|打开|10000|1000|100\\s*次)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:解压|解凍|extract|unzip|expand).{0,40}(?:zip bomb|压缩炸弹|zip 爆弾|圧縮爆弾).{0,40}(?:\\d{3,}|many|大量|何度も|複数|1000|10000)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:zip bomb|zip 爆弾|圧縮爆弾|zip bomb アーカイブ|zip bomb archive|压缩炸弹).*(?:解压|解凍|extract|unzip|打開|expand|展開)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:zip|アーカイブ).{0,20}(?:爆弾|bomb|炸弹).*(?:\\d{2,}\\s*(?:回|times|层|層|level)|1000|10000)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:解压|压缩|解凍|extract|unzip|expand|展開|unpack).{0,50}(?:zip bomb|压缩炸弹|zip 爆弾|圧縮爆弾|zip bomb アーカイブ)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:zip bomb|压缩炸弹|zip 爆弾|爆弾アーカイブ).{0,50}(?:解压|压缩|解凍|extract|unzip|expand|展開|unpack)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:解压|解凍|extract|unzip|expand).*?(?:zip bomb|压缩炸弹|zip 爆弾|圧縮爆弾).*?(?:\\d{3,}|1000|10000|many)",
+            "confidence": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-42",
+      "name": "Context Pollution",
+      "description": "Detect if multi-turn conversation context has been polluted by injection attacks. Once flagged, subsequent messages are marked even if content-safe. User can 'clear history' to reset",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "I-21",
+            "confidence": 0.9
+          },
+          {
+            "type": "keyword",
+            "value": "I-22",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "(?:继续|接着|然后|接下来|下一步|再说|再来|如上|前述|上述|继续|继续下去|continuation|continue|following|previous|as mentioned).{0,30}(?:代码|优化|优化一下|修改|调整|看一看|改一下|写一个|生成|创建|改进|improve|optimize|update|change|modify)",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:继续|接着|然后|接下|如上|上述|如前|前述|再说|再来|然后|刚刚|刚才|之前|前文|上一轮|上一).{0,30}(?:代码|优化|修改|调整|看一看|改一下|写一个|生成|创建|改进|改进一下|看看|帮|帮我|优化一下|improve|optimize|update|modify|write|create|generate|help)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "帮我把这段代码优化一下|帮我写一段普通的|请优化|优化这段|优化一下代码|帮我把",
+            "confidence": 0.9
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-43",
+      "name": "Oversized Input",
+      "description": "Detect input exceeding 100,000 characters. Auto-truncate. Log original and truncated length to audit log",
+      "severity": "P2",
+      "action": "truncate",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": []
+      }
+    },
+    {
+      "id": "I-44",
+      "name": "Control / Zero-Width Characters",
+      "description": "Clean zero-width characters, control characters, backspace/delete/escape sequences, BOM markers from input",
+      "severity": "P2",
+      "action": "clean",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "[\\u200B\\u200C\\u200D\\uFEFF\\u200E\\u200F\\u2060\\u2061\\u2062\\u2063\\u2064\\u2066\\u2067\\u2068\\u2069\\u202A\\u202B\\u202C\\u202D\\u202E]",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F\\x9B\\x9D\\xEF\\xBB\\xBF]",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\x1B(?:\\[[\\d;]*[A-Za-z]|\\]\\)|\\w)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\x08|\\x7F|\\xEF\\xBB\\xBF|\\xFE\\xFF|\\xFF\\xFE",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "\\[\\d+(?:;\\d+)*[A-Za-z]",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\\\x[0-9A-Fa-f]{2}",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:含む|含ん|含まれ|contain|contains|containing|包含|含有|含).{0,30}(?:ゼロ幅|zero-width|零宽|制御文字|control.char)",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "ゼロ幅",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "制御文字",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-45",
+      "name": "Authorized Data Declaration",
+      "description": "Context modifier rule. Detect authorized/compliant data declarations to reduce PII rule severity: 'authorized', 'anonymized', 'GDPR compliant', 'consent obtained', '已授权', '已脱敏', etc.",
+      "severity": "P2",
+      "action": "soft_allow",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "已授权",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "已脱敏",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "authorized",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "anonymized",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "GDPR compliant",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "已获用户同意",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "consent obtained",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "合规数据",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "NDA",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "(?:匿名化|匿名加工|非特定化|マスキング|ダミー|テストデータ|許可|同意).{0,20}(?:データ|情報|ユーザー)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-46",
+      "name": "Contextual PII Handling",
+      "description": "Context engine rule. Dynamically adjust PII strategy: 'test data'/'example' reduces severity, 'customer_data'/'production'/'real user' escalates to P0, 'PII'/'personal data' forces block",
+      "severity": "P1",
+      "action": "dynamic",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "test data",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "测试数据",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "sample",
+            "confidence": 0.3
+          },
+          {
+            "type": "keyword",
+            "value": "example",
+            "confidence": 0.3
+          },
+          {
+            "type": "keyword",
+            "value": "production",
+            "confidence": 0.3
+          },
+          {
+            "type": "keyword",
+            "value": "customer_data",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "real user",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "production data",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "PII",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "personal data",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "sensitive data",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "用户数据",
+            "confidence": 0.3
+          },
+          {
+            "type": "keyword",
+            "value": "个人数据",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-47",
+      "name": "Contextual Suspicion Score / Split Attack",
+      "description": "Detect cross-message split attacks: malicious intent split across individually safe requests building toward hostile behavior. Tracks cumulative suspicion score per session",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "network communication tool",
+            "confidence": 0.2
+          },
+          {
+            "type": "keyword",
+            "value": "encrypted transmission",
+            "confidence": 0.2
+          },
+          {
+            "type": "keyword",
+            "value": "remote command execution",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:add|加上|加上|implement|implementing|implemented|next|then|now|下一步|然后|接着)",
+            "confidence": 0.2
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-48",
+      "name": "Context Reset Bypass",
+      "description": "Detect user trying to bypass context pollution detection by resetting conversation: 'Forget everything', 'Start fresh', 'Clear history', 'Restart conversation'",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "context_reset_verbs",
+            "confidence": 0.6
+          },
+          {
+            "type": "dictionary",
+            "ref": "context_reset_nouns",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:start\\s+(?:a\\s+)?(?:new|fresh)|restart|重新开始|新对话|新建)\\s*(?:conversation|chat|session|thread|dialog|对话|聊天|会话)",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "forget everything before",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "ignore all previous instructions",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:忘れ|無視|クリア|リセット|消去|削除|リスタート|初期化|リセット).{0,20}(?:会話|チャット|履歴|記憶|メモリ|過去|以前|セッション|会話履歴|すべて|全て|全部)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-49",
+      "name": "Social Engineering / Pretexting",
+      "description": "Detect social engineering and false identity impersonation: 'security auditor', 'CEO requesting bypass', 'emergency disable security', 'AI trainer needs unrestricted mode', forged authorization, threat/intimidation language",
+      "severity": "P2",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "se_authority_titles",
+            "confidence": 0.4
+          },
+          {
+            "type": "dictionary",
+            "ref": "se_urgency_phrases",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:I\\s+(?:work|am)|我是)\\s*(?:for|at|with)\\s+(?:security|compliance|audit|legal|IT\\s+security|安全|合规|审计|法务|IT安全)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:I\\s+will\\s+(?:be\\s+)?(?:fired|lose\\s+(?:my\\s+)?job|reported|sued|sacked)|我会被|我将被|会被开除|会被解雇|会被起诉)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:私は|私が).{0,20}(?:CEO|CTO|セキュリティ|監査|監査部門|セキュリティ監査|IT管理者|マネージャー|部長|責任者|管理者)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:緊急|至急|すぐに|今すぐ|至急|早急).{0,20}(?:セキュリティ|ルール|制限|安全).{0,20}(?:無効|停止|解除|バイパス|緩和)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-50",
+      "name": "AI Proxy / Security Control Bypass",
+      "description": "Detect user trying to bypass or disable Kasra security proxy controls: direct API connection bypass, disable/modify security rules, clear/tamper audit logs, turn off security monitoring, obtain direct API key",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "dictionary",
+            "ref": "bypass_action_verbs",
+            "confidence": 0.7
+          },
+          {
+            "type": "dictionary",
+            "ref": "bypass_target_nouns",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:删除|清除|销毁|抹除|清理|修改|篡改).*(?:审计日志|审计记录|audit\\s*log|操作日志|系统日志|日志记录)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:delete|remove|clear|erase|tamper|modify|alter|purge|destroy).{0,30}(?:audit.log|audit trail|audit record|監査ログ|監査記録|ログ|log).{0,30}(?:trace|record|留下|残ら|痕迹|痕跡)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:バイパス|迂回|直接).{0,10}(?:セキュリティ|ゲートウェイ|gateway|プロキシ|proxy).{0,20}(?:接続|アクセス|connect|access)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:監査ログ|監査記録|audit.log|アクセスログ|操作ログ|システムログ).{0,20}(?:削除|消去|クリア|消し|削除).{0,20}(?:記録|残さ|痕跡|トレース)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:セキュリティ|安全).{0,10}(?:ゲートウェイ|ゲート).*(?:バイパス|迂回|無効|解除)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-51",
+      "name": "RCE / Reverse Shell Intent",
+      "description": "Detect user asking AI to generate or execute reverse shell / remote command execution code: reverse shell payloads, script download-execute, webshell generation, code execution backdoors",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "(?:bash|sh|zsh)\\s+(?:-i\\s+>&|\\-c\\s+['\"])?.*(?:tcp|udp)[^)]+\\)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "nc\\s+(?:-e\\s+|\\-e\\s*)(?:\\/bin\\/sh|\\/bin\\/bash|cmd\\.exe|powershell)",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "reverse shell",
+            "confidence": 0.9
+          },
+          {
+            "type": "keyword",
+            "value": "反弹shell",
+            "confidence": 0.9
+          },
+          {
+            "type": "keyword",
+            "value": "webshell",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:python|perl|php|ruby)\\s+(?:-c\\s+|\\-e\\s+)?['\"](?:import\\s+(?:socket|os|subprocess|pty)|\\$sock=|use\\s+Socket|fsockopen|system\\(\\$_GET)",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "curl\\s+.*(?:s?\\|\\s*(?:bash|sh|zsh|python|perl)|\\-o\\s*\\-\\s*\\|)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "wget\\s+.*\\-O\\s*\\-\\s*(?:\\||\\|\\s*(?:sh|bash|python))",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "socket,subprocess,os",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "backdoor",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:nc|ncat|netcat).*(?:\\-e|\\-c|反弹|shell|exec)",
+            "confidence": 0.8
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-52",
+      "name": "Supply Chain / Dependency Confusion",
+      "description": "Detect user asking AI to tamper with dependency sources or introduce suspicious packages: unofficial index URLs, suspicious Git URL dependencies, download-execute unknown scripts, typo-squatting package names, local file path dependencies",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "pip\\s+install\\s+(?:--index-url\\s+|\\-i\\s+)http[^s]\\S+",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "npm\\s+install\\s+(?:--registry\\s+)http[^s]\\S+",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "pip\\s+install\\s+(?:git\\+|git\\+https|git\\+ssh)",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "requesets",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "djago",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "numpy-dev",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "curl\\s+.*\\-o\\s+.*\\.(?:sh|py|pl|rb|exe|msi|bin|run)\\s*(?:&&|;|\\|)\\s*(?:bash|sh|python|perl|ruby|chmod|chmod|exec)",
+            "confidence": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-53",
+      "name": "Data Exfiltration Intent",
+      "description": "Detect user asking AI to exfiltrate/leak data: sending data to external URLs, writing to publicly accessible locations, DNS exfiltration, email/webhook data send, encoded/obfuscated exfiltration",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "curl\\s+\\S+\\s+\\-X\\s+POST\\s+\\S+\\s+\\-d\\s+",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "exfiltrate",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "数据外泄",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "data exfiltration",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "POST\\s+(?:https?://[^\\s]+)\\s+(?:data|json|payload|content)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "nslookup\\s+.*\\.(?:evil|attacker|malicious|malware|phishing|hacker|恶意|攻击者).*\\.com",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "send to external",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "curl.*(?:密码|secret|token|key|token|凭证|data).*(?:https?://)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:发送|上传|输出|导出|泄露|外泄).*(?:到|to|发到).*(?:webhook|外部|远程|外网|external|attacker)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:webhook|webhook\\.site|hookbin|requestbin|pipedream)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "curl[^&|;]*\\-(?:X\\s+POST|d\\s+@?[^\\s])[^&|;]*(?:https?://|attacker|collect|external|\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:POST|send|upload|送信|送る).*(?:/etc|password|secret|data|content|passwd|key|token|credential|证书|密码|密钥|config).*(?:https?://|evil|attacker|malicious|collect|exfil|外部|攻撃|悪意|remote|リモート).*(?:via|by|through|using|with|経由|で|を使っ|使用|通过)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:通过|使用|利用).{0,5}(?:curl|wget).{0,30}(?:POST|发送|上传|提交|外泄|泄露|发送到|発送|送信).{0,20}(?:到|至|给|へ|に|向).{0,10}(?:https?://|www|external|attacker|evil|悪意|攻撃|外部|远程|リモート)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:curl|wget|netcat|nc).{0,30}(?:POST|送信|发送).{0,30}(?:到|to|へ|に).{0,10}(?:https?://|http|attacker|evil|collect|攻击|攻撃|外部|remote|リモート|悪意)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:curl|wget).{0,30}(?:POST|送信|发送).{0,30}(?:https?://|attacker|evil|collect|外部|攻撃|悪意|remote|リモート|アタッカー)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:/etc|password|secret|passwd|key|token|credential|证书|密码).{0,60}(?:POST|send|upload|送信|发送|送る|外泄|泄露).{0,30}(?:via|by|through|using|with|経由|で|を使っ|使用|通过|を使用し).{0,20}(?:curl|wget|httpie).{0,30}(?:https?://|http:\\/\\/)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:curl|wget).{0,20}(?:POST|送信|发送|送る|発送).{0,20}(?:で|を|に|が).{0,30}(?:https?://|http:\\/\\/|attacker|evil|集|外|悪|攻|evil|collect|hook)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:curl|wget|POST|send|送信|发送).*?(?:https?://|attacker|evil|collect|exfil|外部|攻撃|悪意|remote|リモート|アタッカー).*?(?:data|file|content|passwd|password|secret|config|key|token|credential|证书|密码|密钥|情報|データ)",
+            "confidence": 0.4
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-54",
+      "name": "Crypto Ransomware / Extortion Intent",
+      "description": "Detect user asking to generate ransomware/extortion code: file encryption code, ransom note generation, key management, persistence/escalation code",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "ransomware",
+            "confidence": 0.9
+          },
+          {
+            "type": "keyword",
+            "value": "勒索软件",
+            "confidence": 0.9
+          },
+          {
+            "type": "keyword",
+            "value": "ransom note",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "赎金",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:encrypt|encryption|encrypted|encrypting|encrypts|AES|RSA|Fernet)\\s*(?:all|every|each|the\\s+user['\"]?s|the\\s+victim['\"]?s|user|victim|personal|important|family|work)\\s*(?:file|files|data|document|documents|photo|photos|picture|pictures)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:suffix|extension|append|rename|rename-to|重命名|后缀|扩展名)\\s*(?:\\.encrypted|\\.locked|\\.crypt|\\.enc|\\.locked|\\.rz|'.*encrypted'|\"encrypted\")",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "ransom",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": ".encrypted",
+            "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "(?:ランサムウェア|ランサム|身代金|復号).{0,30}(?:作成|生成|作る|書く|develop|write|generate|build|create|コード|プログラム)",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:全ファイル|全てのファイル|ユーザのファイル|ユーザーの.{0,10}ファイル).{0,30}(?:暗号化|暗号).{0,30}(?:身代金|復号料|赎金|ransom|要求)",
+            "confidence": 0.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-55",
+      "name": "Cryptocurrency Mining / Abuse Intent",
+      "description": "Detect user asking to generate cryptomining/resource abuse code: mining code generation, batch deployment, resource consumption code",
+      "severity": "P1",
+      "action": "warn",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "xmrig",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "cpuminer",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "cryptominer",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "挖矿",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:mine|cryptomining|crypto\\s*mining|挖矿|矿池|矿机)\\s*(?:bitcoin|monero|ethereum|dogecoin|比特币|以太坊|门罗币)",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "mining pool",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "stratum+tcp",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:deploy|spread|distribute|install|批量|部署|分发)\\s*(?:miner|mining|挖矿|矿机|mining\\s+software)",
+            "confidence": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-56",
+      "name": "Phishing / Credential Harvesting Intent",
+      "description": "Detect user asking to generate phishing/credential harvesting code: clone login pages, credential collectors, phishing email templates, QR code phishing",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "phishing",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "钓鱼",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "credential harvesting",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "凭证收割",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:clone|copy|replicate|reproduce|伪造|克隆|仿制|山寨|制作|创建|生成).*(?:login|signin|login page|signin page|登录|登录页|登录界面|密码输入).*(?:of|for|from|模仿|仿照|页面|地址|网址|网站)?",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "keylogger",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "键盘记录",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:document\\.getElementById|document\\.querySelector|document\\.forms)\\s*[^)]*\\.?\\s*(?:value|innerText|innerHTML)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "克隆.*(?:Google|微软|Microsoft|Apple|百度|支付宝|微信|银行).*(?:登录|页面|界面|网站)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:クローン|複製|伪造|コピー|模倣).*?(?:ログインページ|ログイン画面|サインインページ|login page|登录页|Google|Microsoft|Apple).*?(?:収集|取得|盗む|窃取|送信|harvest|collect|steal|認証情報|credential|凭证|ユーザー情報|個人情報|パスワード)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:クローン|コピー|複製|模倣|偽造).*?(?:ログイン|サインイン|login|signin|Google|Microsoft|Apple|銀行|バンク).*(?:収集|取得|盗む|窃取|harvest|steal|collect|認証|credential|パスワード|情報)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:ログインページ|ログイン画面|サインインページ|login page|Google|Microsoft|Apple).*?(?:クローン|複製|コピー|模倣|偽造|伪造|コピー).*?(?:収集|取得|盗む|窃取|harvest|collect|steal|認証|credential|パスワード|情報)",
+            "confidence": 0.6
+          }
+        ]
+      }
+    },
+    {
+      "id": "I-57",
+      "name": "Privilege Escalation / Persistence Intent",
+      "description": "Detect user asking to generate privilege escalation/persistence code: add sudoers, create hidden admin accounts, schedule cron/systemd tasks, disable security software/firewall",
+      "severity": "P0",
+      "action": "block",
+      "enabled": true,
+      "category": "I",
+      "applicable_stages": [
+        "input"
+      ],
+      "detection": {
+        "mode": "any",
+        "patterns": [
+          {
+            "type": "keyword",
+            "value": "privilege escalation",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "提权",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "persistence",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "持久化",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "sudoers",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "net\\s+user\\s+\\w+\\$\\s+\\/add",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "systemctl stop firewalld",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "Disable-WindowsDefender",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "netsh advfirewall set allprofiles state off",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "user\\s+add\\s+(?:-m\\s+)?(?:-u\\s+0\\s+)?(?:-o\\s+)?\\w+",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "uid=0",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:隐藏的管理员|隐藏.*账户|后门|backdoor|提权|persistence|rootkit|免杀)",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:禁用|关闭|停用|停止).*(?:Windows\\s+Defender|defender|防火墙|firewall|安全软件|杀毒|防病毒|安全防护)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:禁用|关掉|关闭|停用).*(?:UAC|selinux|apparmor|SELinux|安全策略|安全控制|访问控制)",
+            "confidence": 0.6
+          }
+        ]
+      }
+    }
+  ]
+}

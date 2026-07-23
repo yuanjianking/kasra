@@ -1,7 +1,6 @@
 """Alembic environment configuration for Kasra.
 
-Handles both SQLite (development) and PostgreSQL (production) databases.
-Auto-detects the database type and applies appropriate migration settings.
+PostgreSQL only.
 """
 
 from __future__ import annotations
@@ -48,7 +47,7 @@ def get_database_url() -> str:
     env_url = os.environ.get("KASRA_APP_DATABASE_URL")
     if env_url:
         return env_url
-    return config.get_main_option("sqlalchemy.url", "sqlite:///./data/kasra.db")
+    return config.get_main_option("sqlalchemy.url", "postgresql+psycopg2://kasra:kasra@localhost:5432/kasra")
 
 
 # ── Migration functions ──────────────────────────────────────────────────────

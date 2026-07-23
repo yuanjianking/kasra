@@ -1,12 +1,13 @@
 """Database connection and session management.
 
-Supports both SQLite (development) and PostgreSQL (production).
-Uses SQLAlchemy with connection pooling for production workloads.
+PostgreSQL only (production-grade).
+Uses SQLAlchemy with connection pooling.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any, Generator
@@ -27,84 +28,38 @@ class Base(DeclarativeBase):
 
 # ── Database type detection ────────────────────────────────────────────────
 
-def is_sqlite(url: str) -> bool:
-    return url.startswith("sqlite")
-
 def is_postgres(url: str) -> bool:
     return url.startswith("postgresql")
 
 def get_db_type(url: str) -> str:
-    if is_sqlite(url):
-        return "sqlite"
-    elif is_postgres(url):
-        return "postgres"
-    return "unknown"
+    return "postgres" if is_postgres(url) else "unknown"
 
 
 # ── Engine creation ─────────────────────────────────────────────────────────
 
 def _create_engine(database_url: str, echo: bool = False) -> Engine:
-    """Create a SQLAlchemy engine with appropriate configuration.
-
-    SQLite:
-      - ``check_same_thread=False`` for FastAPI thread safety
-      - WAL mode for better concurrent read/write
-      - Foreign keys enabled
-
-    PostgreSQL:
-      - Connection pooling via SQLAlchemy's QueuePool
-      - Statement timeout to prevent runaway queries
-      - ``application_name`` for identifying connections
-    """
+    """Create a SQLAlchemy engine for PostgreSQL with connection pooling."""
     db_type = get_db_type(database_url)
-    connect_args: dict[str, Any] = {}
-
-    if db_type == "sqlite":
-        connect_args["check_same_thread"] = False
-        connect_args["timeout"] = 30  # SQLite busy timeout in seconds
-
-        # Ensure the parent directory exists
-        db_path = database_url.replace("sqlite:///", "")
-        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-
-    elif db_type == "postgres":
-        connect_args["application_name"] = "kasra"
+    connect_args: dict[str, Any] = {"application_name": "kasra"}
 
     engine = create_engine(
         database_url,
         connect_args=connect_args,
         echo=echo,
-        # PostgreSQL pool settings (ignored by SQLite)
-        pool_size=10 if db_type == "postgres" else 5,
-        max_overflow=20 if db_type == "postgres" else 10,
-        pool_pre_ping=True,  # Verify connections before using them
-        pool_recycle=3600,   # Recycle connections after 1 hour
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True,
+        pool_recycle=3600,
     )
 
-    # ── SQLite pragmas ──
-    if db_type == "sqlite":
-        @event.listens_for(engine, "connect")
-        def _set_sqlite_pragma(dbapi_connection: Any, _: Any) -> None:
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.execute("PRAGMA cache_size=-8000")  # 8 MB
-            cursor.execute("PRAGMA busy_timeout=30000")
-            cursor.close()
+    # ── Connection logging ──
+    @event.listens_for(engine, "connect")
+    def _receive_connect(dbapi_connection: Any, _: Any) -> None:
+        logger.debug("PostgreSQL connection established")
 
-        # Removed: The @event.listens_for(engine, "begin") hook that executed SELECT 1
-        # on every transaction start. This caused unnecessary overhead for SQLite.
-
-    # ── PostgreSQL connection logging ──
-    if db_type == "postgres":
-        @event.listens_for(engine, "connect")
-        def _receive_connect(dbapi_connection: Any, _: Any) -> None:
-            logger.debug("PostgreSQL connection established")
-
-        @event.listens_for(engine, "checkout")
-        def _receive_checkout(dbapi_connection: Any, _: Any, _exc: Any) -> None:
-            logger.debug("PostgreSQL connection checked out from pool")
+    @event.listens_for(engine, "checkout")
+    def _receive_checkout(dbapi_connection: Any, _: Any, _exc: Any) -> None:
+        logger.debug("PostgreSQL connection checked out from pool")
 
     logger.info("Database engine created: %s (pool_size=%d)", db_type,
                 engine.pool.size() if hasattr(engine.pool, 'size') else 'default')
@@ -131,14 +86,9 @@ def check_db_health() -> dict[str, Any]:
     db_type = get_db_type(settings.database_url)
     try:
         with SessionLocal() as session:
-            if db_type == "postgres":
-                result = session.execute(
-                    __import__("sqlalchemy").text("SELECT version()")
-                ).scalar()
-            else:
-                result = session.execute(
-                    __import__("sqlalchemy").text("SELECT sqlite_version()")
-                ).scalar()
+            result = session.execute(
+                __import__("sqlalchemy").text("SELECT version()")
+            ).scalar()
             return {
                 "status": "healthy",
                 "db_type": db_type,
@@ -173,26 +123,31 @@ def init_db(retry: int = 3, retry_delay: float = 2.0) -> None:
     from app.models.user import User  # noqa: F401
     from app.models.category import Category  # noqa: F401
     from app.models.pattern_type import PatternType  # noqa: F401
+    from app.models.dictionary import Dictionary  # noqa: F401
 
-    last_error: Exception | None = None
-    for attempt in range(1, retry + 1):
-        try:
-            Base.metadata.create_all(bind=engine)
-            logger.info("Database tables initialized (attempt %d/%d)", attempt, retry)
-            return
-        except Exception as exc:
-            last_error = exc
-            if "does not exist" in str(exc).lower() and attempt < retry:
-                logger.warning(
-                    "Database not ready yet (attempt %d/%d): %s",
-                    attempt, retry, exc,
-                )
-                time.sleep(retry_delay)
-            else:
-                raise
+    # File lock to prevent concurrent init by multiple uvicorn workers
+    import fcntl
+    lock_path = "/tmp/kasra_init.lock"
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        locked = True
+    except (IOError, OSError):
+        locked = False
 
-    if last_error:
-        raise RuntimeError(f"Failed to initialize database after {retry} attempts") from last_error
+    if not locked:
+        logger.info("init_db skipped (lock held by another worker)")
+        return
+
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables initialized.")
+    except Exception:
+        logger.exception("init_db failed")
+        raise
+    finally:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 # ── Dependency ──────────────────────────────────────────────────────────────

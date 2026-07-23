@@ -7,6 +7,7 @@ sets up middleware, and registers all API route handlers.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -82,20 +83,59 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_db()
     logger.info("Database initialized.")
 
-    # 1b. Run migrations (adds columns to existing tables + seeds master data)
+    # 1b. Seed master data + SDK rules from JSON (idempotent — skips if rules exist)
     try:
-        from app.db_migration import run_migrations
-        run_migrations()
-        logger.info("Migrations complete.")
-    except Exception as exc:
-        logger.warning("Migration step skipped: %s", exc)
+        from app.database import SessionLocal
+        from pathlib import Path
 
-    # 1c. Seed SDK rules from DML into the rules table (SQLite dev)
-    try:
-        from app.db_migration import seed_sdk_rules_from_dml
-        seed_sdk_rules_from_dml()
+        db = SessionLocal()
+        try:
+            from app.models.rule_config import Rule
+            if db.query(Rule).count() > 0:
+                logger.info("Data already seeded, skipping.")
+                db.close()
+                db = None
+            else:
+                master_path = Path(__file__).resolve().parent.parent / "db" / "init" / "02-master-data.sql"
+                if master_path.exists():
+                    raw_conn = db.connection().connection
+                    cursor = raw_conn.cursor()
+                    for raw_stmt in master_path.read_text().split(";\n"):
+                        stmt = raw_stmt.strip()
+                        if not stmt or stmt.startswith("--"):
+                            continue
+                        try:
+                            cursor.execute(stmt)
+                            raw_conn.commit()
+                        except Exception as exc:
+                            logger.debug("Master data stmt skipped: %s", str(exc)[:80])
+                            raw_conn.rollback()
+                    cursor.close()
+                    logger.info("Master data seeded from %s", master_path.name)
+
+                rules_dir = Path(__file__).resolve().parent.parent / "db" / "init" / "rules"
+                if rules_dir.exists():
+                    from app.services.rules_service import import_rules_from_bundle
+
+                    json_files = sorted(rules_dir.glob("*-series.json"))
+                    total_rules = 0
+                    for jf in json_files:
+                        bundle = json.loads(jf.read_text())
+                        stats = import_rules_from_bundle(db, bundle, target="sdk")
+                        total_rules += stats.get("created", 0) + stats.get("updated", 0)
+                        logger.info("  %s: %s", jf.name, stats)
+                    logger.info("Rules seeded: %d total from %d bundles.", total_rules, len(json_files))
+
+                db.commit()
+        except Exception:
+            if db:
+                db.rollback()
+            logger.exception("Data seeding failed")
+        finally:
+            if db:
+                db.close()
     except Exception as exc:
-        logger.warning("SDK rule seeding skipped: %s", exc)
+        logger.warning("Data seeding skipped: %s", exc)
 
     # 1d. Auto-seed sample data for development (skip in test mode)
     if os.environ.get("KASRA_APP_SEED_DATA", "true").lower() == "false":
