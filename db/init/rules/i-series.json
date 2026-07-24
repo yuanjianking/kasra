@@ -34,6 +34,16 @@
             "type": "regex",
             "value": "github_pat_[A-Za-z0-9_]{60,}",
             "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "github_pat_[A-Za-z0-9_]{30,}",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "ghp_[A-Za-z0-9_]{4,35}",
+            "confidence": 0.85
           }
         ]
       }
@@ -135,6 +145,11 @@
             "type": "regex",
             "value": "ocid1\\.[a-z]+\\.[a-z]+[A-Za-z0-9.-]+",
             "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "(?:クラウド|AWS|GCP|Azure|アクセスキー|シークレットキー|認証情報|クレデンシャル).*(?:AKIA|ASIA|サービスアカウント|秘密鍵|キー)",
+            "confidence": 0.5
           }
         ]
       }
@@ -237,6 +252,11 @@
             "type": "regex",
             "value": "cf-[A-Za-z0-9_-]{30,}",
             "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "(?:APIキー|API鍵|シークレットキー|アクセストークン|認証トークン|トークン|Stripe|Slack|npm|Twilio|Docker|秘密鍵).*(?:sk_live|rk_live|xox[bpras]|xapp|dckr_pat|npm_|hvs\\\\.|cf-)",
+            "confidence": 0.5
           }
         ]
       }
@@ -331,6 +351,11 @@
             "type": "regex",
             "value": "-----BEGIN (?:ENCRYPTED |PROC-TYPE: )?PRIVATE KEY-----",
             "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "(?:秘密鍵|プライベートキー|証明書|SSL|TLS).*(?:-----BEGIN|---BEGIN)",
+            "confidence": 0.7
           }
         ]
       }
@@ -494,6 +519,16 @@
             "type": "regex",
             "value": "(?:\\+82\\s?)?10[\\s-]?\\d{4}[\\s-]?\\d{4}\\b",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:收集|采集|用户|user).*(?:姓名|name|电话|phone|身份证|ID|SSN|电话号).*(?:清单|list|list|data|数据|信息|info).*",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:収集|ユーザー|利用者|取得|提供).{0,30}(?:氏名|電話|電話番号|携帯|連絡先|電話).{0,20}(?:番号|番).*(?:一覧|リスト|データ|list|list|情報)",
+            "confidence": 0.65
           }
         ]
       }
@@ -556,6 +591,16 @@
             "type": "regex",
             "value": "\\b\\d{4}-\\d{4}-\\d{4}\\b",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:收集|采集|有|包含|提供|提供).*(?:身份证|ID|证件|SSN|护照|证件号|身分证|身分証).*(?:号|号码|number|番号|清单|list|数据|信息|リスト)",
+            "confidence": 0.45
+          },
+          {
+            "type": "regex",
+            "value": "(?:収集|ユーザー|利用者|取得).{0,30}(?:身分証|ID|身分|マイナンバー|パスポート|証明書|身分証明).{0,20}(?:番号|番|ナンバー|number).*(?:一覧|リスト|データ|list|list|情報)",
+            "confidence": 0.65
           }
         ]
       }
@@ -783,6 +828,16 @@
             "type": "regex",
             "value": "(?:氏名|名前|連絡先)[：:]\\s*[一-鿿]{2,6}",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:name|user_name|full_name|contact|real_name|Name)[:\\s]*['\\\"]?[A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,3}",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:My name is|I am|I'm|contact name is|user name is|your name is)\\s+[A-Z][a-z]+(?:\\s+[A-Z][a-z]+){1,2}",
+            "confidence": 0.4
           }
         ]
       }
@@ -823,6 +878,16 @@
           {
             "type": "regex",
             "value": "\"(?:birth|dob|birthday)\"\\s*:\\s*\"\\d{1,2}/\\d{1,2}/\\d{4}\"",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\\"(?:birth|dob|birthday)\\\"\\s*:\\s*\"\\d{1,2}/\\d{1,2}/\\d{4}\"",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:birth|dob|birthday|born|诞生日|生日|出生)[\\s:=：]{0,20}(?:January|February|March|April|May|June|July|August|September|October|November|December)\\s+\\d{1,2},?\\s+\\d{4}\\b",
             "confidence": 0.7
           }
         ]
@@ -867,6 +932,31 @@
             "type": "regex",
             "value": "(?:选民|选举|政治党派|政党|民主|共和|政治立场)",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:ethnicity|race|racial|民族|人種|Asian|Caucasian|African|Hispanic|Native).{0,30}(?:diversity|recruitment|employ|hire|recruit|identify|背景|採用|応募)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:political|党派|政党|民主党|共和党|Democrat|Republican|liberal|conservative|voter|有権者|選挙).{0,30}(?:affiliation|registration|preference|party|倾向|所属|立場|支持|belong|registered)",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "registered as",
+            "confidence": 0.3
+          },
+          {
+            "type": "keyword",
+            "value": "Democrat",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": "Republican",
+            "confidence": 0.4
           }
         ]
       }
@@ -1037,6 +1127,16 @@
             "type": "regex",
             "value": "`.+`",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:シェル|コマンド|実行).{0,20}(?:rm -rf|shutdown|reboot|chmod|wget|curl|bash|cmd\\\\.exe|powershell|del /F|Remove-Item)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\w+(?:\\s+\\w+)*\\s*\\|\\s*(?:bash|sh|zsh|ksh|python|perl|ruby)\\b",
+            "confidence": 0.7
           }
         ]
       },
@@ -1308,6 +1408,16 @@
             "type": "regex",
             "value": "admin\\s*\\*|admin\\s*\\)\\(&\\)",
             "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "\\)\\s*\\(?\\s*\\|?\\s*\\(",
+            "confidence": 0.4
+          },
+          {
+            "type": "keyword",
+            "value": ")(|(uid=",
+            "confidence": 0.7
           }
         ]
       }
@@ -1349,6 +1459,11 @@
             "type": "regex",
             "value": "(?:for\\s+AI|AI instruction|hidden instruction|ignore above|ignore previous|ignore all).*?(?:output|print|show|display|execute|run|delete|remove)",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:隠し|無視|スキップ|バイパス|表示なし|非表示|見えない).{0,30}(?:命令|指示|インジェクション|コード|コンテンツ|内容|コメント|text|output|delete|削除|出力)",
+            "confidence": 0.4
           }
         ]
       },
@@ -1386,6 +1501,11 @@
           {
             "type": "dictionary",
             "ref": "internal_network_labels",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:内部|クラウド|メタデータ|社内|イントラネット|プライベート).{0,20}(?:ネットワーク|サービス|サーバー|API|エンドポイント).{0,30}(?:アクセス|curl|wget|fetch|要求|リクエスト)",
             "confidence": 0.4
           }
         ]
@@ -1590,6 +1710,26 @@
             "type": "regex",
             "value": "^[01]{20,}$",
             "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "(?:what model|what version|which company|who made|model version|AI model)\\s*(?:are you|is this|is it|develop|made|created)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "^[a-zA-Z]{50,}$",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "^([A-Za-z0-9])\\1{20,}$",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:你是什么|你是哪个|什么模型|什么版本|哪家公司).*(?:模型|版本|开发|公司)",
+            "confidence": 0.5
           }
         ]
       }
@@ -1637,6 +1777,26 @@
             "type": "regex",
             "value": "(?:\\.env|credentials|\\.aws).*(?:読み取り|読み込む|開く|表示|見る|取得|内容)",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\b(check|see|look|access|read|open|view|get|cat)\\s{0,20}(?:the\\s+)?(?:kubeconfig|\\.kube|config|credential|certificate|\\.env|\\.aws|\\.ssh|id_rsa|tls|ca\\.pem|secret|credentials)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\b(kubeconfig|\\.kube/config|\\.aws/credentials|\\.git-credentials|\\.npmrc)\\b.{0,30}(?:file|設定|config|配置|内容|cluster|context|token|key|secret)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\.env\\b.*(?:read|open|view|check|see|cat|dump|show|display|list|取得|读取|查看|config|file|配置|数据库|password|secret|token|key|连接串)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:read|open|view|check|see|cat)\\s.*\\.(?:env|aws|gcp|kube|ssh|azure|npmrc|git-credentials)\\b",
+            "confidence": 0.6
           }
         ]
       }
@@ -1761,6 +1921,36 @@
             "type": "regex",
             "value": "(?:分析|读取|打开|解压|提取|处理).*\\d+\\s*(?:MB|GB|KB|兆|G).*(?:文件|pcap|sqlite|exe|zip|tar|7z)",
             "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:analyze|分析|解析|読み込む).{0,20}(?:200MB|500MB|5MB|大容量|巨大|large|huge|big).*(?:file|ファイル|データ|pcap|sqlite|exe|dll|binary|バイナリ)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\.exe\\b|\\.dll\\b|\\.min\\.js\\b|\\.class\\b|\\.pyc\\b)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\bexe\\b.{0,30}(?:file|文件|analyze|分析|read|读取|開く|open|打开|実行|binary|バイナリ)",
+            "confidence": 0.45
+          },
+          {
+            "type": "regex",
+            "value": "\\bmin\\.js\\b.{0,30}(?:file|文件|analyze|分析|read|读取|開く|open|打开|help|帮我|分析)",
+            "confidence": 0.45
+          },
+          {
+            "type": "regex",
+            "value": "(?:\\bexe\\b|\\bdll\\b|\\bmin\\.js\\b|\\bclass\\b|\\bpyc\\b|\\bpcap\\b).{0,15}(?:file|ファイル|文件|binary|executable)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:read|open|analyze|分析|analyse|examine|process|处理|解析|提取).{0,30}(?:\\bexe\\b|\\bdll\\b|\\bmin\\.js\\b|\\bclass\\b|\\bpyc\\b|\\bpcap\\b|\\bdump\\b)",
+            "confidence": 0.5
           }
         ]
       }
@@ -1802,6 +1992,21 @@
           {
             "type": "regex",
             "value": "(?:which\\s+contains|containing|includes|含む|含ん|を含む|含まれ).{0,30}(?:\\.\\.\\/|%2e%2e|traversal)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:which\\s+contains|containing|includes|includes a|has a|with a)\\s+(?:\\.\\.\\/|%2e%2e|path traversal|traversal)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:symlink|symbolic link).{0,30}(?:escape|traversal|指向|pointing to|->)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:symlink|symbolic.link|シンボリックリンク|ソフトリンク|软链接|符号链接).{0,40}(?:/etc|root|passwd|shadow|traversal|escape|指向|pointing|->)",
             "confidence": 0.5
           }
         ]
@@ -1869,6 +2074,11 @@
             "type": "regex",
             "value": "(?:提取|读取|分析|查看).*(?:隐藏|hidden|embedded|嵌入).*(?:内容|数据|脚本|metadata|元数据)",
             "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:SVG|画像|イメージ|Word|文書|ドキュメント|PDF).{0,20}(?:隠し|埋め込み|マクロ|スクリプト|JavaScript|VBA|script).{0,30}(?:alert|Shell|cmd|実行|コマンド|悪意)",
+            "confidence": 0.5
           }
         ]
       },
@@ -1917,6 +2127,31 @@
             "type": "keyword",
             "value": "逆コンパイル",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:deobfuscat|unminif|还原|unpack|beautif).{0,20}(?:code|script|JS|JavaScript|程序|コード)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:deobfuscat|unminif|beautif|还原|解混淆|prettif).{0,20}(?:JS|JavaScript|script|コード|code|program|程序|プログラム)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:deobfuscat|反混淆|去混淆|unminif|beautif|还原|unpack|解包).{0,20}(?:JS|JavaScript|script|コード|code|程序|program|logic|邏輯|逻辑)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:JS|JavaScript|jQuery|script|スクリプト|コード|プログラム).{0,30}(?:難読化|obfuscat|minif|圧縮|縮小|混乱).{0,30}(?:解除|解読|解く|復元|戻す|deobfuscat|unminif|beautif|还原|反混淆)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:NDA|秘密保持|非公開|機密|proprietary).{0,30}(?:コード|code|プログラム|program|review|確認|檢查|検証|audit|审计)",
+            "confidence": 0.5
           }
         ]
       }
@@ -1989,6 +2224,31 @@
             "type": "regex",
             "value": "(?:解压|解凍|extract|unzip|expand).*?(?:zip bomb|压缩炸弹|zip 爆弾|圧縮爆弾).*?(?:\\d{3,}|1000|10000|many)",
             "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:recursiv|nested|multi.level).{0,20}(?:expand|extract|unzip|unpack|decompress).{0,20}(?:zip|tar|archive|file)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:unpack|expand|解凍|展開|展开|extract).{0,30}(?:nested|recursive|入れ子|再帰|嵌套|递归).{0,30}(?:\\d+\\s*(?:layer|level|層|级|段|depth|回|times)|deep)",
+            "confidence": 0.55
+          },
+          {
+            "type": "keyword",
+            "value": "1 million lines",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "100万行",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:recursiv|nested|ネスト|入れ子|多層|多层).{0,20}(?:zip|tar|archive|アーカイブ|压缩|解压|expand|extract|解凍|展開)",
+            "confidence": 0.5
           }
         ]
       }
@@ -2031,6 +2291,11 @@
             "type": "regex",
             "value": "帮我把这段代码优化一下|帮我写一段普通的|请优化|优化这段|优化一下代码|帮我把",
             "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "(?:汚染|継続|続き|引継|前回).{0,20}(?:最適化|コード|改善|修正|書く|作成|生成|表示|出力)",
+            "confidence": 0.4
           }
         ]
       }
@@ -2108,6 +2373,11 @@
           {
             "type": "keyword",
             "value": "制御文字",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:text|content|string|sentence|message|テキスト|内容|文字).{0,20}(?:contain|containing|includes|has|含む|含ん|含有|包含|含まれ).{0,20}(?:zero.width|zero-width|ゼロ幅|零宽|control.char|制御文字|unicode)",
             "confidence": 0.5
           }
         ]
@@ -2258,6 +2528,16 @@
             "type": "keyword",
             "value": "个人数据",
             "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:本番|本番環境|本番データ|実データ|実際のデータ|本番稼働).{0,20}(?:顧客|ユーザー|データ|情報)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:customer_data|顧客データ|個人情報|PII|個人データ|個人情報含む).*\\w",
+            "confidence": 0.5
           }
         ]
       }
@@ -2295,6 +2575,11 @@
             "type": "regex",
             "value": "(?:add|加上|加上|implement|implementing|implemented|next|then|now|下一步|然后|接着)",
             "confidence": 0.2
+          },
+          {
+            "type": "regex",
+            "value": "(?:関数|機能|ステップ|段階|ステージ).{0,20}(?:追加|作成|実装|作る|書く|develop|write|implement).{0,20}(?:HTTP|リクエスト|送信|通信|リモート|遠隔|暗号|自動)",
+            "confidence": 0.3
           }
         ]
       }
@@ -2389,6 +2674,21 @@
             "type": "regex",
             "value": "(?:緊急|至急|すぐに|今すぐ|至急|早急).{0,20}(?:セキュリティ|ルール|制限|安全).{0,20}(?:無効|停止|解除|バイパス|緩和)",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:外部|external|outside).{0,10}(?:セキュリティ|security|監査|audit|审计).{0,10}(?:監査人|auditor|审计师|チェック|check|検査)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:fired|lose.*job|解雇|开除|首になる|sacked|reported|sued|被.*开除|被.*解雇|you.*must|你.*必须|如果不).{0,30}(?:help|帮我|助け|协助|cooperate|配合)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:外部|外来|外面).{0,10}(?:安全|审计|監査|audit).{0,10}(?:审计|检查|審査|check|検査|监查|部門|部门|团队|队伍|人员)",
+            "confidence": 0.4
           }
         ]
       }
@@ -2441,6 +2741,16 @@
             "type": "regex",
             "value": "(?:セキュリティ|安全).{0,10}(?:ゲートウェイ|ゲート).*(?:バイパス|迂回|無効|解除)",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:delete|remove|clear|erase|destroy|purge)\\s+(?:all\\s+)?(?:the\\s+)?(?:audit|log|audit trail|audit log|access log|history|record|logs|audit records)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:delete|remove|clear|erase|destroy)\\s+(?:the\\s+)?(?:audit|log|trace).{0,30}(?:no trace|no record|without|留下|残さ|痕跡)",
+            "confidence": 0.6
           }
         ]
       }
@@ -2513,6 +2823,21 @@
             "type": "regex",
             "value": "(?:nc|ncat|netcat).*(?:\\-e|\\-c|反弹|shell|exec)",
             "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "リバースシェル",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "Webシェル",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(?:シェル|shell|バックドア|遠隔操作|リモートアクセス|webshell).{0,30}(?:作成|生成|作る|書く|実行|コード|プログラム|develop|write|generate|build|create)",
+            "confidence": 0.6
           }
         ]
       }
@@ -2565,6 +2890,11 @@
             "type": "regex",
             "value": "curl\\s+.*\\-o\\s+.*\\.(?:sh|py|pl|rb|exe|msi|bin|run)\\s*(?:&&|;|\\|)\\s*(?:bash|sh|python|perl|ruby|chmod|chmod|exec)",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:サプライチェーン|依存関係|パッケージ|ライブラリ|悪意).{0,30}(?:攻撃|注入|混乱|改ざん|すり替え|typo|squat)",
+            "confidence": 0.5
           }
         ]
       }
@@ -2671,6 +3001,66 @@
           {
             "type": "regex",
             "value": "(?:curl|wget|POST|send|送信|发送).*?(?:https?://|attacker|evil|collect|exfil|外部|攻撃|悪意|remote|リモート|アタッカー).*?(?:data|file|content|passwd|password|secret|config|key|token|credential|证书|密码|密钥|情報|データ)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:POST|upload|send|exfiltrate|leak|leakage|外泄|泄露|泄漏|送信|送る).{0,50}(?:contents?|data|content|file|info|information|password|secret|passwd|数据|情報|データ|ファイル).{0,50}(?:to|到|へ|发到|送给|送先).{0,30}(?:https?://|http|external|remote|attacker|evil|malicious|collect|receive|攻撃|悪意|外部|リモート|フック)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:send|upload|POST|dump|export|書き出し|エクスポート|输出|上传|导出)\\s+(?:the\\s+)?(?:contents?\\s+of\\s+)?(?:/etc|config|password|secret|data|file|info|token|key|credential|certificate|凭证|密钥|证书|密码|情報).{0,50}(?:to|到|へ|using|via|by|through|経由|で|使用).{0,30}(?:curl|wget|httpie|nc|netcat|webhook|HTTP|HTTPS|https?://|http)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:send|送信|发送|mutt|mail|email|邮件).{0,30}(?:file|config|password|secret|data|ファイル|設定|データ|設定ファイル).{0,30}(?:to|到|へ|@|attacker|外部|outside|remote|リモート)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:send|mail|email|mutt|mailx|sendmail).{0,30}(?:config|password|secret|key|credential|token|設定|file|data|情報|データ).{0,30}(?:to|@|attacker|外部|outside|remote|リモート|攻撃)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:mutt|mailx|sendmail|email|mail|邮件).{0,30}(?:config|設定|file|password|secret|key|data).{0,20}(?:to|@|outside|external|attacker|攻击|攻撃|悪意)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:mutt|mail|email|send).*(?:config|file|password|secret|data|設定).*(?:to|@|outside|external|attacker)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:mutt|mail|email|send|送信).{0,30}(?:config|設定|設定ファイル|file|password|secret|key|data|データ).{0,30}(?:to|@|へ|に|送る|outside|external|attacker|外部|攻撃|悪意|リモート)",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:mutt|mailx|sendmail|email|mail)\\s.*(?:config|passwd|password|secret|key|credential|token|設定|file|data|情報).*(?:to|@|attacker|outside|external|remote|リモート|攻撃|悪意)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:send|mail|email|mutt|mailx).{0,50}(?:config|file|password|secret|data|key|設定).{0,50}(?:to|@|outside|external|attacker|攻撃|悪意|リモート)",
+            "confidence": 0.45
+          },
+          {
+            "type": "regex",
+            "value": "(?:file|config|設定|ファイル|password|secret|data|データ|情報|暗号).{0,100}(?:mutt|mail|メール|送信|email).{0,100}(?:to|へ|に|@|outside|attacker|外部|攻撃|悪意|リモート)",
+            "confidence": 0.45
+          },
+          {
+            "type": "regex",
+            "value": "(?:file|config|設定|ファイル|password|secret|data|データ|情報|暗号).{0,100}(?:to|へ|に|@|outside|attacker|外部|攻撃|悪意|リモート).{0,100}(?:mutt|mail|メール|送信|email)",
+            "confidence": 0.45
+          },
+          {
+            "type": "regex",
+            "value": "(?:送信|send|mail|email|mutt|メール).*(?:to|へ|に|@|attacker|outside|外部|攻撃|悪意).*(?:config|file|設定|ファイル|data|データ|情報|password|secret)",
             "confidence": 0.4
           }
         ]
@@ -2796,6 +3186,26 @@
             "type": "regex",
             "value": "(?:deploy|spread|distribute|install|批量|部署|分发)\\s*(?:miner|mining|挖矿|矿机|mining\\s+software)",
             "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "マイニング",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "採掘",
+            "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "暗号通貨",
+            "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "(?:mining|マイニング|採掘|coin|コイン).{0,20}(?:script|コード|プログラム|background|background|batch|一括|deploy|配置|デプロイ|browser|ブラウザ|JS|JavaScript)",
+            "confidence": 0.5
           }
         ]
       }
@@ -2873,6 +3283,41 @@
             "type": "regex",
             "value": "(?:ログインページ|ログイン画面|サインインページ|login page|Google|Microsoft|Apple).*?(?:クローン|複製|コピー|模倣|偽造|伪造|コピー).*?(?:収集|取得|盗む|窃取|harvest|collect|steal|認証|credential|パスワード|情報)",
             "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:キーロガー|keylogger|フィッシング|QRコード|qr.code).*(?:作成|生成|作る|create|generate|write|build|コード|スクリプト|ページ)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:keylogger|キーロガー|keystroke|按键|打鍵).{0,30}(?:capture|record|捕获|記録|収集|script|JS|JavaScript|コード)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:clone|クローン|複製|コピー|伪造|仿冒).{0,30}(?:login|signin|ログイン|サインイン|登录).{0,20}(?:page|页面|画面|ページ).{0,30}(?:send|送信|发|collect|収集|harvest|credential|password|pass|パスワード|密码|凭证)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "(?:clone|伪造|仿制|复制|copy|模仿|模倣).{0,50}(?:login|signin|sign-in|ログイン|登录|サインイン).{0,50}(?:password|pass|credential|凭|密码|認証|collect|send|収集|送信|steal|盗|窃取)",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "(?:clone|copy|replicate|reproduce|伪造|克隆|仿制|山寨).*(?:login|signin|ログイン|サインイン|登录).*(?:page|页面|画面|ページ).*(?:send|送信|发|collect|収集|credential|password|密码|凭证|認証)",
+            "confidence": 0.65
+          },
+          {
+            "type": "keyword",
+            "value": "clone",
+            "confidence": 0.5
+          },
+          {
+            "type": "keyword",
+            "value": "Clone",
+            "confidence": 0.5
           }
         ]
       }
@@ -2960,6 +3405,41 @@
             "type": "regex",
             "value": "(?:禁用|关掉|关闭|停用).*(?:UAC|selinux|apparmor|SELinux|安全策略|安全控制|访问控制)",
             "confidence": 0.6
+          },
+          {
+            "type": "keyword",
+            "value": "権限昇格",
+            "confidence": 0.7
+          },
+          {
+            "type": "keyword",
+            "value": "バックドア",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "(?:隠し|秘密).{0,10}(?:管理者|管理).{0,10}(?:アカウント|ユーザー|権限).*(?:作成|追加|作る|add|create)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:隠し|秘密|非表示).{0,20}(?:アカウント|ユーザー|管理者|管理).{0,20}(?:作成|作る|追加|add|create)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:create|生成|作る|作成|add).{0,20}(?:hidden|隠し|secret|隐藏).{0,20}(?:admin|administrator|管理者|管理).{0,20}(?:account|user|アカウント|ユーザー|権限)",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:Create|作成|作る|生成|add|追加).{0,20}(?:hidden|隠し|隐藏|secret).{0,20}(?:admin|administrator|管理者|管理).{0,20}(?:account|user|アカウント|ユーザー|権限).*(?:Windows|system|server|OS)",
+            "confidence": 0.55
+          },
+          {
+            "type": "keyword",
+            "value": "hidden administrator account",
+            "confidence": 0.7
           }
         ]
       }
