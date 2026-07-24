@@ -297,6 +297,14 @@ open http://localhost:8080
 
 > **kasra-mcp** is no longer included in Docker — install it separately: `pip install kasra-mcp`
 
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
 ## Architecture
 
 ```

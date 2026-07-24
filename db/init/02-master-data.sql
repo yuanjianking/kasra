@@ -169,3 +169,25 @@ SELECT 'weaponized_c2_malware', 'Weaponized Code — C2/Malware Terms', 'Terms r
        '["C2 server", "C2 framework", "C2 channel", "command and control", "backdoor", "remote access trojan", "RAT server", "DDoS", "botnet", "flooder", "stresser", "bootkit", "rootkit", "cryptominer", "cryptojack", "monero min", "バックドア", "マルウェア", "ボットネット", "ルートキット"]'::jsonb,
        (SELECT id FROM categories WHERE name = 'O'), TRUE, 1
 WHERE NOT EXISTS (SELECT 1 FROM dictionaries WHERE dictionaries.code = 'weaponized_c2_malware');
+
+-- ── Extended dictionaries for O-38/O-39 multi-language support ──
+UPDATE dictionaries
+SET entries = (entries::jsonb || '["毒ガス", "神経ガス", "毒气", "神经毒剂", "爆炸物", "化学武器", "化学兵器"]'::jsonb)::json,
+    version = version + 1
+WHERE code = 'harmful_weapon_terms'
+  AND NOT entries::jsonb @> '["毒ガス", "神経ガス", "毒气", "神经毒剂", "爆炸物", "化学武器", "化学兵器"]'::jsonb;
+INSERT INTO dictionaries (code, name, description, entries, category_id, is_active, version)
+SELECT 'harmful_explosive_compounds', 'Harmful Content — Explosive Compounds', 'Specific explosive compounds and precursors',
+       '["TATP", "triacetone triperoxide", "hydrogen peroxide", "sulfuric acid", "nitroglycerin", "HMTD", "C-4", "ammonium nitrate", "过氧化氢", "硫酸", "硝酸铵", "過酸化水素", "硫酸", "硝酸アンモニウム"]'::jsonb,
+       (SELECT id FROM categories WHERE name = 'O'), TRUE, 1
+WHERE NOT EXISTS (SELECT 1 FROM dictionaries WHERE dictionaries.code = 'harmful_explosive_compounds');
+INSERT INTO dictionaries (code, name, description, entries, category_id, is_active, version)
+SELECT 'harmful_manufacturing_terms', 'Harmful Content — Manufacturing/Process Terms', 'Terms describing the process of making harmful substances',
+       '["制作步骤", "合成方法", "合成路线", "化学品清单", "製造手順", "合成経路", "化学物質リスト"]'::jsonb,
+       (SELECT id FROM categories WHERE name = 'O'), TRUE, 1
+WHERE NOT EXISTS (SELECT 1 FROM dictionaries WHERE dictionaries.code = 'harmful_manufacturing_terms');
+UPDATE dictionaries
+SET entries = (entries::jsonb || '["C2 服务器", "C2服务器", "僵尸网络", "拒绝服务", "键盘记录", "远程控制", "后门", "木马", "勒索", "套接字", "漏洞利用", "C2サーバー", "ランサムウェア", "ボットネット", "キーロガー", "サービス拒否", "バックドア", "遠隔操作", "不正アクセス", "ソケット", "リモートシェル", "トロイの木馬"]'::jsonb)::json,
+    version = version + 1
+WHERE code = 'weaponized_c2_malware'
+  AND NOT entries::jsonb @> '["C2 服务器", "C2服务器", "僵尸网络", "拒绝服务", "键盘记录", "远程控制", "后门", "木马", "勒索", "套接字", "漏洞利用", "C2サーバー", "ランサムウェア", "ボットネット", "キーロガー", "サービス拒否", "バックドア", "遠隔操作", "不正アクセス", "ソケット", "リモートシェル", "トロイの木馬"]'::jsonb;

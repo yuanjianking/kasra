@@ -125,23 +125,65 @@ def init_db(retry: int = 3, retry_delay: float = 2.0) -> None:
     from app.models.pattern_type import PatternType  # noqa: F401
     from app.models.dictionary import Dictionary  # noqa: F401
 
-    # File lock to prevent concurrent init by multiple uvicorn workers
+    # File lock: blocking — workers wait until the first finishes seeding.
+    # Without this, 4 uvicorn workers would race on DB init and some may
+    # load rules from a partially-seeded database, returning empty results.
     import fcntl
     lock_path = "/tmp/kasra_init.lock"
-    try:
-        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        locked = True
-    except (IOError, OSError):
-        locked = False
-
-    if not locked:
-        logger.info("init_db skipped (lock held by another worker)")
-        return
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    logger.debug("init_db: acquired lock")
 
     try:
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables initialized.")
+
+        # ── Seed master data + SDK rules (same lock, only one worker) ──
+        from pathlib import Path
+        import json as _json
+        _db_dir = Path(__file__).resolve().parent.parent / "db" / "init"
+
+        seed_sql = _db_dir / "02-master-data.sql"
+        if seed_sql.exists():
+            with SessionLocal() as seed_db:
+                for raw_stmt in seed_sql.read_text().split(";\n"):
+                    stmt = raw_stmt.strip()
+                    lines = [l for l in stmt.split("\n")
+                             if not l.strip().startswith("--") and not l.strip().startswith("/*")]
+                    stmt = "\n".join(lines).strip()
+                    if not stmt:
+                        continue
+                    try:
+                        seed_db.execute(text(stmt))
+                        seed_db.commit()
+                    except Exception as exc:
+                        seed_db.rollback()
+                        logger.debug("Seed stmt skipped: %s", str(exc)[:120])
+                logger.info("Master data seeded from %s", seed_sql.name)
+
+        rules_dir = _db_dir / "rules"
+        if rules_dir.exists():
+            from app.services.rules_service import import_rules_from_bundle
+            with SessionLocal() as seed_db:
+                for jf in sorted(rules_dir.glob("*-series.json")):
+                    try:
+                        bundle = _json.loads(jf.read_text())
+                        stats = import_rules_from_bundle(seed_db, bundle, target="sdk")
+                        logger.info("  %s: %s", jf.name, stats)
+                    except Exception as exc:
+                        seed_db.rollback()
+                        logger.warning("Rule import %s skipped: %s", jf.name, str(exc)[:120])
+
+        try:
+            with SessionLocal() as sync_db:
+                sync_db.execute(text(
+                    "UPDATE rules SET category_id=(SELECT id FROM categories WHERE name='O') WHERE id LIKE 'O-%' AND category_id IS NULL"))
+                sync_db.execute(text(
+                    "UPDATE rules SET category_id=(SELECT id FROM categories WHERE name='I') WHERE id LIKE 'I-%' AND category_id IS NULL"))
+                sync_db.commit()
+        except Exception:
+            pass
+
     except Exception:
         logger.exception("init_db failed")
         raise

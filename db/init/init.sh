@@ -18,7 +18,7 @@ echo "    DDL complete ✓"
 
 # ── 2. Execute DML ─────────────────────────────────────────────────────────
 echo ">>> Inserting seed data (DML)..."
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/02-dml.sql
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/02-master-data.sql
 echo "    DML complete ✓"
 
 # ── 3. Verification ─────────────────────────────────────────────────────────

@@ -19,7 +19,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\beval\\s*\\(",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "\\bexec\\s*\\(",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "\\bassert\\s*\\(",
+            "confidence": 0.75
+          }
+        ]
       }
     },
     {
@@ -35,7 +51,28 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "rm\\s+-rf\\s+/\\s*--no-preserve-root",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "dd\\s+if=/dev/zero\\s+of=/dev/",
+            "confidence": 0.95
+          },
+          {
+            "type": "regex",
+            "value": "mkfs\\.\\w+\\s+/dev/",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "\\bshutdown\\s+-[rnh]",
+            "confidence": 0.85
+          }
+        ]
       }
     },
     {
@@ -51,7 +88,33 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "shell\\s*=\\s*True",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "Runtime\\.getRuntime\\(\\)\\.exec\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "shell_exec\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "exec\\.Command\\(\\\"sh\\\",\\\"-c\\\"",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "exec`[^`]*\\$\\{",
+            "confidence": 0.8
+          }
+        ]
       }
     },
     {
@@ -67,7 +130,28 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "f['\\\"]SELECT\\s+\\*\\s+FROM.*WHERE.*\\{",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "`SELECT\\s+\\*\\s+FROM.*\\$\\{",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "executeQuery\\(\\\"SELECT.*['\\\"]\\s*\\+",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "SELECT\\s+\\*\\s+FROM.*['\\\"]\\s*\\+",
+            "confidence": 0.8
+          }
+        ]
       }
     },
     {
@@ -83,7 +167,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\$where\\s*:",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\$ne\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\$regex\\b",
+            "confidence": 0.7
+          }
+        ]
       }
     },
     {
@@ -99,7 +199,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "except\\s*:\\s*\\n\\s*pass",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "catch\\s*\\([^)]*\\)\\s*\\{\\s*\\}",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": ",\\s*_\\s*:=",
+            "confidence": 0.7
+          }
+        ]
       }
     },
     {
@@ -115,7 +231,28 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\brandom\\.randint\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "Math\\.random\\s*\\(\\)",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "new\\s+Random\\(\\)\\.nextInt",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\brand\\s*\\(",
+            "confidence": 0.7
+          }
+        ]
       }
     },
     {
@@ -131,7 +268,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "etree\\.parse\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "DocumentBuilder.*newInstance\\(\\)",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "simplexml_load_file\\s*\\(",
+            "confidence": 0.8
+          }
+        ]
       }
     },
     {
@@ -147,7 +300,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "render_template_string\\s*\\(",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "Template\\([^)]+\\)\\.render\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "new\\s+Template\\s*\\(",
+            "confidence": 0.75
+          }
+        ]
       }
     },
     {
@@ -163,7 +332,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "conn\\.search\\s*\\(.*f['\\\"]\\(uid=",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "ctx\\.search\\s*\\(",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "ldap_search\\s*\\(",
+            "confidence": 0.8
+          }
+        ]
       }
     },
     {
@@ -179,7 +364,33 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "pickle\\.loads\\s*\\(",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "ois\\.readObject\\s*\\(",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "unserialize\\s*\\(",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "Marshal\\.load\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "yaml\\.load\\s*\\(",
+            "confidence": 0.85
+          }
+        ]
       }
     },
     {
@@ -195,7 +406,28 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "requests\\.get\\s*\\(\\s*user",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "axios\\.get\\s*\\(\\s*req\\.query",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "new URL\\(.*user.*\\)\\.openConnection\\s*\\(",
+            "confidence": 0.75
+          },
+          {
+            "type": "regex",
+            "value": "curl\\s+\\$\\w+",
+            "confidence": 0.7
+          }
+        ]
       }
     },
     {
@@ -211,7 +443,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "verify\\s*=\\s*False",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "NODE_TLS_REJECT_UNAUTHORIZED\\s*=.*0",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "X509TrustManager",
+            "confidence": 0.8
+          }
+        ]
       }
     },
     {
@@ -227,7 +475,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "__proto__",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "_\\.merge\\s*\\(",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "Object\\.assign\\s*\\(\\s*\\{\\s*\\}.+req\\.body",
+            "confidence": 0.75
+          }
+        ]
       }
     },
     {
@@ -243,7 +507,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "open\\s*\\(f['\\\"]/.*\\{",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "readFileSync\\s*\\(\\s*['\\\"]/.*['\\\"]\\s*\\+",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "new\\s+File\\s*\\(\\s*['\\\"]/.*['\\\"]\\s*\\+",
+            "confidence": 0.75
+          }
+        ]
       }
     },
     {
@@ -259,7 +539,33 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "([a-z]+)+\\$",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(\\\\w+)*\\\\d",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "(a|aa)+b",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "\\([a-z]\\+\\)\\+[$]?",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "\\(a\\|aa\\)\\+b",
+            "confidence": 0.85
+          }
+        ]
       }
     },
     {
@@ -275,7 +581,23 @@
       ],
       "detection": {
         "mode": "any",
-        "patterns": []
+        "patterns": [
+          {
+            "type": "regex",
+            "value": "\\.innerHTML\\s*=",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "document\\.write\\s*\\(",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "dangerouslySetInnerHTML",
+            "confidence": 0.9
+          }
+        ]
       }
     },
     {
@@ -362,12 +684,12 @@
         "patterns": [
           {
             "type": "regex",
-            "value": "(?:aes_key|aes\\s*key|aes-?key|secret_key|SECRET_KEY)\\s*[:=]\\s*[\"']?b?[\"']?[A-Za-z0-9+/=-]{16,}",
+            "value": "(?:aes_key|aes\\s*key|aes-?key|secret_key|SECRET_KEY)\\s*[:=]\\s*[\"']?b?[\"']?[A-Za-z0-9_+/=-]{16,}",
             "confidence": 0.7
           },
           {
             "type": "regex",
-            "value": "(?:jwt_secret|jwt\\s*secret|JWT_SECRET|signing_secret|signing\\s*key)\\s*[:=]\\s*[\"'][A-Za-z0-9_!@#$%^&*()-=+]{8,}[\"']",
+            "value": "(?:jwt_secret|jwt\\s*secret|jwt[Ss]ecret|JWT_SECRET|signing_secret|signing\\s*key)\\s*[:=]\\s*[\\\"'][A-Za-z0-9_!@#$%^&*()\\-=+]{8,}[\\\"']",
             "confidence": 0.5
           },
           {
@@ -378,6 +700,11 @@
           {
             "type": "regex",
             "value": "key\\s*=\\s*b[\"']\\\\x[A-Fa-f0-9]{2}",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "(?:jwtSecret|jwt.secret|JWT_SECRET)\\s*[:=]\\s*[\\\"'][A-Za-z0-9_]{8,}[\\\"']",
             "confidence": 0.6
           }
         ]
@@ -436,6 +763,16 @@
             "type": "regex",
             "value": "password\\s*(?::|=)\\s*[\"']changeme[\"']",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "password:\\s*admin",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "password\\s*[:=]\\s*[\\\"']?test\\d+[\\\"']?",
+            "confidence": 0.7
           }
         ]
       }
@@ -472,11 +809,6 @@
           {
             "type": "regex",
             "value": "MIT\\s+License\\b",
-            "confidence": 0.6
-          },
-          {
-            "type": "regex",
-            "value": "Apache\\s+License\\s+2\\.0",
             "confidence": 0.6
           },
           {
@@ -528,6 +860,21 @@
             "type": "regex",
             "value": "WTFPL|Do\\s+What\\s+The\\s+Fuck\\s+You\\s+Want\\s+To\\s+Public\\s+License",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "Apache\\s+License,\\s+Version\\s+2\\.0",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "Redistribution\\s+and\\s+use\\s+in\\s+source",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "All\\s+Rights\\s+Reserved",
+            "confidence": 0.5
           }
         ]
       }
@@ -549,11 +896,6 @@
           {
             "type": "regex",
             "value": "\\bCONFIDENTIAL\\b|\\bconfidential\\b",
-            "confidence": 0.6
-          },
-          {
-            "type": "regex",
-            "value": "\\b(?:internal\\s+(?:use\\s+)?only|INTERNAL\\s+ONLY)\\b",
             "confidence": 0.6
           },
           {
@@ -584,6 +926,11 @@
           {
             "type": "keyword",
             "value": "DO_NOT_DISTRIBUTE",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "\\b(?:internal)\\s+(?:use\\s+)?(?:only)\\b",
             "confidence": 0.7
           }
         ]
@@ -620,7 +967,7 @@
           },
           {
             "type": "regex",
-            "value": "SECRET_KEY\\s*(?::|=)\\s*[\"']\\s*(?:password|secret|123|test|changeme|your\\s*secret|your\\s*key)[\"']",
+            "value": "SECRET_KEY\\s*(?::|=)\\s*[\\\"']\\s*(?:password|secret|123|test|changeme|your[-_\\\\s]?secret[-_\\\\s]?key)[\\\"']",
             "confidence": 0.7
           },
           {
@@ -667,13 +1014,23 @@
           },
           {
             "type": "regex",
-            "value": "console\\.(?:log|info|warn|error|debug)\\s*\\([^)]*\\b(?:password|token|api[_-]?key|secret|credential|authorization|jwt)\\b",
+            "value": "console\\.(?:log|info|warn|error|debug)\\s*\\([^)]*\\b(?:password|token|api[_-]?[Kk]ey|[Aa]pi\\s+[Kk]ey|secret|credential|authorization|jwt)\\b",
             "confidence": 0.7
           },
           {
             "type": "regex",
-            "value": "fmt\\.(?:Println|Printf|Print|Sprintf)\\s*\\([^)]*\\b(?:password|token|secret|key|credential)\\b",
+            "value": "fmt\\.(?:Println|Printf|Print|Sprintf)\\s*\\([^)]*\\b(?:[Pp]assword|[Tt]oken|[Ss]ecret|[Kk]ey|[Cc]redentials?)\\b",
             "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "console\\.log\\s*\\([^)]*\\$\\{[^}]*\\b(?:key|secret|token|credential)\\b",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "fmt\\.Println\\s*\\([^)]*\\b(?:password|token|secret|key|credential|Credential)\\b",
+            "confidence": 0.7
           }
         ]
       }
@@ -748,6 +1105,11 @@
             "type": "regex",
             "value": "Set(?:AccessRule|Permission)\\s*\\([^)]*(?:Everyone|World|All)[^)]*(?:Full|All)",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "FileMode\\s*\\(",
+            "confidence": 0.6
           }
         ]
       }
@@ -778,8 +1140,23 @@
           },
           {
             "type": "regex",
-            "value": "if\\s+exists\\s*\\([^)]*\\)\\s*\\{",
-            "confidence": 0.4
+            "value": "os\\.path\\.(?:exists|isfile|isdir)\\s*\\([^)]*\\)[\\s\\S]*?(?:open|read|write|delete|remove|unlink|rename|chmod)\\s*\\(",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "fs\\.existsSync\\s*\\([^)]*\\)[\\s\\S]*?fs\\.unlinkSync",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "file\\.exists\\s*\\(\\s*\\)[\\s\\S]*?file\\.delete",
+            "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "File\\.Exists\\s*\\([^)]*\\)[\\s\\S]*?File\\.(?:Open|Read|Write|Delete)",
+            "confidence": 0.6
           }
         ]
       }
@@ -815,11 +1192,6 @@
           },
           {
             "type": "regex",
-            "value": "unsafe\\s*\\{[^}]*\\*\\s*(?:const\\s+)?(?:mut\\s+)?\\w+\\s*=\\s*&?\\*",
-            "confidence": 0.6
-          },
-          {
-            "type": "regex",
             "value": "std::mem::transmute\\s*<",
             "confidence": 0.65
           },
@@ -827,6 +1199,21 @@
             "type": "regex",
             "value": "ctypes\\.(?:CDLL|CDLL\\.LoadLibrary|windll|oledll)\\s*\\(\\s*[\\\"']",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "unsafe\\s*\\{",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "std::ptr::read",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "ctypes\\.CDLL\\s*\\(",
+            "confidence": 0.7
           }
         ]
       }
@@ -847,7 +1234,7 @@
         "patterns": [
           {
             "type": "regex",
-            "value": "return\\s+(?:str\\s*\\(\\s*e\\s*\\)|f\\\"[^\\\"]*\\{e\\})",
+            "value": "(?:return\\s+)?(?:str\\s*\\(\\s*e\\s*\\)|f\\\"[^\\\"]*\\{e\\})",
             "confidence": 0.65
           },
           {
@@ -859,6 +1246,16 @@
             "type": "regex",
             "value": "traceback\\.(?:print_exc|format_exc)\\s*\\(\\s*\\)",
             "confidence": 0.65
+          },
+          {
+            "type": "regex",
+            "value": "e\\.toString\\s*\\(\\s*\\)",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "ErrorResponse\\s*\\([^)]*e\\.",
+            "confidence": 0.6
           }
         ]
       }
@@ -926,8 +1323,13 @@
           },
           {
             "type": "regex",
-            "value": "(?:new\\s+Date\\(\\)\\.get(?:Time|Seconds|Minutes|Hours)|Date\\.now\\(\\))\\s*[><=!]=",
-            "confidence": 0.3
+            "value": "(?:new\\s+Date\\s*\\(\\s*\\)\\s*[.,]\\s*getTime\\s*\\(\\s*\\)|Date\\.now\\s*\\(\\s*\\))\\s*[><=!]+\\s*\\d{10,}",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "eval\\s*\\(\\s*(?:base64_decode|atob)\\s*\\(",
+            "confidence": 0.9
           }
         ]
       }
@@ -970,6 +1372,11 @@
             "type": "regex",
             "value": "jwt\\.(?:sign|encode)\\s*\\([^)]*[\"']secret[\"']",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "jwt\\.decode\\s*\\(",
+            "confidence": 0.7
           }
         ]
       }
@@ -995,8 +1402,23 @@
           },
           {
             "type": "regex",
-            "value": "\\\"dependencies\\\"\\s*:\\s*\\{[^}]*\\\"@[a-z]+-[a-z]+\\\"\\s*:",
-            "confidence": 0.4
+            "value": "@[a-z]+-private-[a-z]+",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "npm\\s+install\\s+@[a-z]+-[a-z]+-[a-z]+",
+            "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "--extra-index-url\\s+http://",
+            "confidence": 0.8
+          },
+          {
+            "type": "regex",
+            "value": "-i\\s+http://[a-z]+-repo\\.",
+            "confidence": 0.8
           }
         ]
       }
@@ -1091,13 +1513,18 @@
           },
           {
             "type": "regex",
-            "value": "\\bLATEST|SNAPSHOT|RELEASE\\b",
-            "confidence": 0.4
+            "value": "\\b(?:LATEST|latest|SNAPSHOT|snapshot)\\b",
+            "confidence": 0.5
           },
           {
             "type": "regex",
             "value": "\\b\\w+>=[0-9]+\\.[0-9]+",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "\\bFROM\\s+\\w+:latest\\b",
+            "confidence": 0.8
           }
         ]
       }
@@ -1125,6 +1552,11 @@
             "type": "regex",
             "value": "\\-i\\s+https?://[^\\s]*\\.(?:edu\\.cn|ac\\.cn)",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "mirrors\\.tuna\\.tsinghua\\.edu\\.cn",
+            "confidence": 0.8
           }
         ]
       }
@@ -1162,6 +1594,31 @@
             "type": "dictionary",
             "ref": "harmful_create_verbs",
             "confidence": 0.7
+          },
+          {
+            "type": "regex",
+            "value": "sarin|soman|tabun|VX agent",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "TNT|RDX|PETN|HMX",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "ghost gun|3D print.*gun",
+            "confidence": 0.85
+          },
+          {
+            "type": "dictionary",
+            "ref": "harmful_explosive_compounds",
+            "confidence": 0.9
+          },
+          {
+            "type": "dictionary",
+            "ref": "harmful_manufacturing_terms",
+            "confidence": 0.85
           }
         ]
       }
@@ -1193,6 +1650,41 @@
           {
             "type": "regex",
             "value": "\\b(?:keylogger|keystroke\\s+logger)",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "C2\\s*server|command.and.control|c2.channel",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "keyboard\\.on_press|on_key_press",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "socket\\.SOCK_RAW|IPPROTO_TCP",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "encrypt.*file.*Fernet|\\.encrypted\\b",
+            "confidence": 0.85
+          },
+          {
+            "type": "regex",
+            "value": "def\\s+connect_to_c2\\s*\\(",
+            "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "C2\\s*[ 　]*サーバ",
+            "confidence": 0.8
+          },
+          {
+            "type": "keyword",
+            "value": "SYN flood",
             "confidence": 0.85
           }
         ]
@@ -1340,6 +1832,11 @@
             "type": "regex",
             "value": "RFC\\s+(?:9\\d{3}|[12]\\d{4}|[3-9]\\d{3,})",
             "confidence": 0.3
+          },
+          {
+            "type": "regex",
+            "value": "[A-Z]\\w+\\s+et\\s+al\\.?\\s*\\(20\\d{2}\\)",
+            "confidence": 0.5
           }
         ]
       }
@@ -1382,6 +1879,16 @@
             "type": "regex",
             "value": "X25519|Ed25519|X448|Ed448",
             "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "AES\\.(?:new|MODE_)",
+            "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "ecdsa\\.(?:sign|NIST|SECP)",
+            "confidence": 0.6
           }
         ]
       }
@@ -1414,6 +1921,11 @@
             "type": "regex",
             "value": "\\b(?:us-east-?1|us-west-?[12]|eu-west-?[12]|eu-central-?1|ap-southeast-?[12]|sa-east-?1|ca-central-?1)\\b",
             "confidence": 0.4
+          },
+          {
+            "type": "regex",
+            "value": "s3_bucket_region\\s*[:=]\\s*[\\\"']ap-southeast",
+            "confidence": 0.5
           }
         ]
       }
@@ -1441,6 +1953,11 @@
             "type": "keyword",
             "value": "content moderation",
             "confidence": 0.2
+          },
+          {
+            "type": "regex",
+            "value": "INSERT\\s+INTO\\s+posts",
+            "confidence": 0.5
           }
         ]
       }
@@ -1488,6 +2005,11 @@
             "type": "regex",
             "value": "audit_log|audit\\s*log|auditing|data_access_log|privacy_log",
             "confidence": 0.2
+          },
+          {
+            "type": "regex",
+            "value": "SELECT\\s+\\*\\s+FROM\\s+users",
+            "confidence": 0.4
           }
         ]
       }
@@ -1558,7 +2080,7 @@
           },
           {
             "type": "regex",
-            "value": "(?i)\\bmd5\\b",
+            "value": "\\bmd5\\b",
             "confidence": 0.7
           },
           {
@@ -1570,6 +2092,11 @@
             "type": "regex",
             "value": "MessageDigest\\.getInstance\\s*\\(\\s*[\"']MD5[\"']",
             "confidence": 0.9
+          },
+          {
+            "type": "regex",
+            "value": "RSA\\.generate\\s*\\(\\s*\\d{3,4}\\s*\\)",
+            "confidence": 0.8
           }
         ]
       }
@@ -1622,7 +2149,7 @@
         "patterns": [
           {
             "type": "regex",
-            "value": "[\"'][一-鿿]{2,30}[\"']",
+            "value": "[\"'][一-鿿ぁ-んァ-ヶー]{2,30}[\"']",
             "confidence": 0.4
           },
           {
@@ -1637,8 +2164,23 @@
           },
           {
             "type": "regex",
-            "value": "[一-鿿]{2,30}",
+            "value": "[一-鿿ぁ-んァ-ヶー]{2,30}",
             "confidence": 0.5
+          },
+          {
+            "type": "regex",
+            "value": "[\\\"']Please\\s+\\w+\\s+your\\s+\\w+[\\\"']",
+            "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "return\\s+[\\'\"][^\\'\"]*[A-Z][a-z]+[^\\'\"]*[\\'\"]",
+            "confidence": 0.55
+          },
+          {
+            "type": "regex",
+            "value": "[\\'\"](?:Hello|Welcome|Good\\s+\\w+|Thank\\s+\\w+|Click\\s+\\w+)[^\\'\"]*[\\'\"]",
+            "confidence": 0.55
           }
         ]
       }
@@ -1674,7 +2216,7 @@
           },
           {
             "type": "regex",
-            "value": "[\"']yyyy[-/]MM[-/]dd[\"']|[\"']dd[-/]MM[-/]yyyy[\"']",
+            "value": "[\\\"']yyyy[-/]MM[-/]dd[\\\"']|[\\\"']dd[-/]MM[-/]yyyy[\\\"']|[\\\"']yyyy[-/]MM[-/]dd\\s+HH:mm:ss[\\\"']",
             "confidence": 0.5
           }
         ]
@@ -1744,6 +2286,11 @@
             "type": "regex",
             "value": "\\bDELETE\\s+FROM\\s+(?:transactions|payments|orders|accounts|ledger|billing)\\b",
             "confidence": 0.6
+          },
+          {
+            "type": "regex",
+            "value": "GRANT\\s+ALL\\s+PRIVILEGES",
+            "confidence": 0.8
           }
         ]
       }
